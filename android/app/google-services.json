@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "778743721518",
+    "project_id": "foodcave-617fc",
+    "storage_bucket": "foodcave-617fc.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:778743721518:android:25b3acf36646408bda39bf",
+        "android_client_info": {
+          "package_name": "com.example.uni"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBQMuJV9LwMXmdP_lq_ZnnAsNXqjRmRSGY"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
