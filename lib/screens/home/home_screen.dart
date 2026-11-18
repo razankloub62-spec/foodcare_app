@@ -7,6 +7,7 @@ import '../../models/product_model.dart';
 import '../../screens/alerts/alerts_screen.dart';
 import '../../screens/settings/settings_screen.dart';
 import '../../screens/shopping/shopping_list_screen.dart';
+import '../../screens/barcode_scanner_screen.dart';
 import '../../theme/theme_manager.dart';
 import '../../utils/helpers.dart';
 
@@ -132,6 +133,32 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
                   tooltip: 'إلغاء التحديد',
                   onPressed: () => setState(() => _selectedDocIds.clear()),
                 ),
+              IconButton(
+                icon: Icon(Icons.qr_code_scanner_rounded, color: primaryColor),
+                tooltip: 'مسح الباركود',
+                onPressed: () async {
+                  final scannedCode = await Navigator.push(
+                    context,
+                    MaterialPageRoute(builder: (_) => const BarcodeScannerScreen()),
+                  );
+                  if (scannedCode != null && context.mounted) {
+                    showDialog(
+                      context: context,
+                      builder: (context) => AlertDialog(
+                        backgroundColor: const Color(0xFF1F1A2B),
+                        title: const Text('نتيجة الباركود', style: TextStyle(color: Colors.white)),
+                        content: Text('الكود الممسوح: $scannedCode', style: const TextStyle(color: Colors.white70)),
+                        actions: [
+                          TextButton(
+                            onPressed: () => Navigator.pop(context),
+                            child: Text('حسناً', style: TextStyle(color: primaryColor)),
+                          ),
+                        ],
+                      ),
+                    );
+                  }
+                },
+              ),
               IconButton(
                 icon: Icon(Icons.shopping_cart_outlined, color: primaryColor),
                 tooltip: 'قائمة التسوق',
@@ -424,7 +451,7 @@ class _ChefChatSheet extends StatefulWidget {
 class _ChefChatSheetState extends State<_ChefChatSheet> {
   final TextEditingController _msgController = TextEditingController();
   final ScrollController _scrollController = ScrollController();
-  final List<Map<String, String>> _messages = [];
+  final List<dynamic> _messages = [];
   late ChatSession _chatSession;
   bool _isTyping = true;
 

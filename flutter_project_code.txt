@@ -1,0 +1,2591 @@
+﻿=== File: D:\foodcare_app\foodcare_app\lib\models\product_model.dart ===
+enum ProductStatus { fresh, expiringSoon, expired }
+
+class Product {
+  final String name;
+  final String date;
+  final int quantity;
+  final ProductStatus status;
+
+  Product({
+    required this.name,
+    required this.date,
+    required this.quantity,
+    required this.status,
+  });
+
+  static ProductStatus calculateStatus(String dateStr) {
+    try {
+      final expiryDate = DateTime.parse(dateStr);
+      final today = DateTime.now();
+      final difference = expiryDate.difference(DateTime(today.year, today.month, today.day)).inDays;
+
+      if (difference < 0) {
+        return ProductStatus.expired;
+      } else if (difference <= 3) {
+        return ProductStatus.expiringSoon;
+      } else {
+        return ProductStatus.fresh;
+      }
+    } catch (_) {
+      return ProductStatus.fresh;
+    }
+  }
+
+  factory Product.fromMap(Map<String, dynamic> map) {
+    final dateStr = map['date'] ?? '';
+    return Product(
+      name: map['name'] ?? '',
+      date: dateStr,
+      quantity: map['quantity'] ?? 1,
+      status: calculateStatus(dateStr),
+    );
+  }
+
+  Map<String, dynamic> toMap() {
+    return {
+      'name': name,
+      'date': date,
+      'quantity': quantity,
+      'status': status.name,
+    };
+  }
+}
+
+=== File: D:\foodcare_app\foodcare_app\lib\models\shopping_item_model.dart ===
+class ShoppingItem {
+  final String id;
+  final String name;
+  final int quantity;
+  final bool isChecked;
+
+  ShoppingItem({
+    required this.id,
+    required this.name,
+    required this.quantity,
+    this.isChecked = false,
+  });
+
+  factory ShoppingItem.fromMap(String id, Map<String, dynamic> map) {
+    return ShoppingItem(
+      id: id,
+      name: map['name'] ?? '',
+      quantity: map['quantity'] ?? 1,
+      isChecked: map['isChecked'] ?? false,
+    );
+  }
+
+  Map<String, dynamic> toMap() {
+    return {
+      'name': name,
+      'quantity': quantity,
+      'isChecked': isChecked,
+    };
+  }
+}
+
+=== File: D:\foodcare_app\foodcare_app\lib\screens\add_product\add_product_screen.dart ===
+import 'package:flutter/material.dart';
+import '../../models/product_model.dart';
+import '../../theme/theme_manager.dart';
+import '../../utils/helpers.dart';
+
+class AddProductScreen extends StatefulWidget {
+  final Product? existingProduct;
+  const AddProductScreen({super.key, this.existingProduct});
+
+  @override
+  State<AddProductScreen> createState() => _AddProductScreenState();
+}
+
+class _AddProductScreenState extends State<AddProductScreen> {
+  final _nameController = TextEditingController();
+  final _dateController = TextEditingController();
+  int _quantity = 1;
+  final _formKey = GlobalKey<FormState>();
+
+  bool get _isEditing => widget.existingProduct != null;
+
+  @override
+  void initState() {
+    super.initState();
+    if (_isEditing) {
+      _nameController.text = widget.existingProduct!.name;
+      _dateController.text = widget.existingProduct!.date;
+      _quantity = widget.existingProduct!.quantity;
+    }
+  }
+
+  Future<void> _selectDate(BuildContext context, Color primaryColor) async {
+    DateTime initialDate = DateTime.now().add(const Duration(days: 3));
+    if (_dateController.text.isNotEmpty) {
+      try {
+        initialDate = DateTime.parse(_dateController.text);
+      } catch (_) {}
+    }
+    final DateTime? picked = await showDatePicker(
+      context: context,
+      initialDate: initialDate,
+      firstDate: DateTime(2024),
+      lastDate: DateTime(2035),
+      builder: (context, child) {
+        return Theme(
+          data: Theme.of(context).copyWith(
+            colorScheme: ColorScheme.dark(
+              primary: primaryColor,
+              onPrimary: const Color(0xFF16121E),
+              surface: const Color(0xFF1F1A2B),
+              onSurface: Colors.white,
+            ),
+          ),
+          child: child!,
+        );
+      },
+    );
+    if (picked != null) {
+      setState(() {
+        _dateController.text =
+            '${picked.year}-${picked.month.toString().padLeft(2, '0')}-${picked.day.toString().padLeft(2, '0')}';
+      });
+    }
+  }
+
+  @override
+  void dispose() {
+    _nameController.dispose();
+    _dateController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return ValueListenableBuilder<Color>(
+      valueListenable: ThemeManager.themeColor,
+      builder: (context, primaryColor, _) {
+        return Scaffold(
+          backgroundColor: const Color(0xFF16121E),
+          appBar: AppBar(
+            title: Text(
+              _isEditing ? 'ØªØ¹Ø¯ÙŠÙ„ Ø¨ÙŠØ§Ù†Ø§Øª Ø§Ù„Ù…Ù†ØªØ¬ âœï¸âœ¨' : 'Ø¥Ø¶Ø§ÙØ© ØºØ±Ø¶ Ø¬Ø¯ÙŠØ¯ Ù„Ù€ FoodCare ðŸŒ¸',
+              style: const TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold),
+            ),
+            backgroundColor: Colors.transparent,
+            elevation: 0,
+            centerTitle: true,
+            iconTheme: const IconThemeData(color: Colors.white),
+          ),
+          body: Stack(
+            children: [
+              Positioned(
+                top: -50,
+                right: -50,
+                child: Container(
+                  width: 190,
+                  height: 190,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    gradient: RadialGradient(colors: [primaryColor.withValues(alpha: 0.18), primaryColor.withValues(alpha: 0.0)]),
+                  ),
+                ),
+              ),
+              Padding(
+                padding: const EdgeInsets.all(24.0),
+                child: Form(
+                  key: _formKey,
+                  child: ListView(
+                    children: [
+                      KawaiiFloatingWidget(
+                        child: Center(
+                          child: Container(
+                            padding: const EdgeInsets.all(18),
+                            decoration: BoxDecoration(
+                              color: primaryColor.withValues(alpha: 0.15),
+                              shape: BoxShape.circle,
+                              border: Border.all(color: primaryColor.withValues(alpha: 0.4), width: 2),
+                            ),
+                            child: Text(_isEditing ? 'âœï¸' : 'ðŸ±', style: const TextStyle(fontSize: 40)),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 24),
+                      KawaiiFadeSlide(
+                        index: 1,
+                        child: TextFormField(
+                          controller: _nameController,
+                          style: const TextStyle(color: Colors.white),
+                          decoration: InputDecoration(
+                            labelText: 'Ø§Ø³Ù… Ø§Ù„Ù…Ù†ØªØ¬ (Ù…Ø«Ø§Ù„: Ø­Ù„ÙŠØ¨ØŒ Ø¨ÙŠØ¶ØŒ ÙØ±Ø§ÙˆÙ„Ø©)',
+                            labelStyle: TextStyle(color: Colors.grey.shade400),
+                            prefixIcon: Icon(Icons.fastfood_rounded, color: primaryColor),
+                            filled: true,
+                            fillColor: const Color(0xFF1F1A2B),
+                            border: OutlineInputBorder(borderRadius: BorderRadius.circular(20), borderSide: BorderSide.none),
+                          ),
+                          validator: (value) => value == null || value.isEmpty ? 'ÙŠØ±Ø¬Ù‰ Ø¥Ø¯Ø®Ø§Ù„ Ø§Ø³Ù… Ø§Ù„Ù…Ù†ØªØ¬' : null,
+                        ),
+                      ),
+                      const SizedBox(height: 16),
+                      KawaiiFadeSlide(
+                        index: 2,
+                        child: TextFormField(
+                          controller: _dateController,
+                          readOnly: true,
+                          onTap: () => _selectDate(context, primaryColor),
+                          style: const TextStyle(color: Colors.white),
+                          decoration: InputDecoration(
+                            labelText: 'ØªØ§Ø±ÙŠØ® Ø§Ù†ØªÙ‡Ø§Ø¡ Ø§Ù„ØµÙ„Ø§Ø­ÙŠØ©',
+                            hintText: 'Ø§Ø¶ØºØ·ÙŠ Ù„Ø§Ø®ØªÙŠØ§Ø± Ø§Ù„ØªØ§Ø±ÙŠØ® Ù…Ù† Ø§Ù„ØªÙ‚ÙˆÙŠÙ…',
+                            hintStyle: TextStyle(color: Colors.grey.shade600, fontSize: 13),
+                            labelStyle: TextStyle(color: Colors.grey.shade400),
+                            prefixIcon: Icon(Icons.calendar_month_rounded, color: primaryColor),
+                            filled: true,
+                            fillColor: const Color(0xFF1F1A2B),
+                            border: OutlineInputBorder(borderRadius: BorderRadius.circular(20), borderSide: BorderSide.none),
+                          ),
+                          validator: (value) => value == null || value.isEmpty ? 'ÙŠØ±Ø¬Ù‰ Ø§Ø®ØªÙŠØ§Ø± ØªØ§Ø±ÙŠØ® Ø§Ù„ØµÙ„Ø§Ø­ÙŠØ©' : null,
+                        ),
+                      ),
+                      const SizedBox(height: 20),
+                      KawaiiFadeSlide(
+                        index: 3,
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFF1F1A2B),
+                            borderRadius: BorderRadius.circular(20),
+                            border: Border.all(color: primaryColor.withValues(alpha: 0.35)),
+                          ),
+                          child: Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              const Text('Ø§Ù„ÙƒÙ…ÙŠØ© Ø§Ù„Ù…Ø·Ù„ÙˆØ¨Ø©:', style: TextStyle(color: Colors.white, fontSize: 16)),
+                              Row(
+                                children: [
+                                  IconButton(
+                                    onPressed: () {
+                                      if (_quantity > 1) setState(() => _quantity--);
+                                    },
+                                    icon: Icon(Icons.remove_circle_rounded, color: primaryColor),
+                                  ),
+                                  AnimatedSwitcher(
+                                    duration: const Duration(milliseconds: 200),
+                                    child: Text(
+                                      '$_quantity',
+                                      key: ValueKey<int>(_quantity),
+                                      style: TextStyle(color: primaryColor, fontSize: 20, fontWeight: FontWeight.bold),
+                                    ),
+                                  ),
+                                  IconButton(
+                                    onPressed: () => setState(() => _quantity++),
+                                    icon: Icon(Icons.add_circle_rounded, color: primaryColor),
+                                  ),
+                                ],
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 32),
+                      KawaiiFadeSlide(
+                        index: 4,
+                        child: ElevatedButton(
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: primaryColor,
+                            foregroundColor: const Color(0xFF16121E),
+                            padding: const EdgeInsets.symmetric(vertical: 16),
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(22)),
+                            elevation: 6,
+                            shadowColor: primaryColor.withValues(alpha: 0.4),
+                          ),
+                          onPressed: () {
+                            if (_formKey.currentState!.validate()) {
+                              final dateStr = _dateController.text.trim();
+                              final updatedProduct = Product(
+                                name: _nameController.text.trim(),
+                                date: dateStr,
+                                quantity: _quantity,
+                                status: Product.calculateStatus(dateStr),
+                              );
+                              Navigator.pop(context, updatedProduct);
+                            }
+                          },
+                          child: Text(
+                            _isEditing ? 'Ø­ÙØ¸ Ø§Ù„ØªØ¹Ø¯ÙŠÙ„Ø§Øª âœ¨' : 'Ø­ÙØ¸ ÙÙŠ FoodCare ðŸ’–',
+                            style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+}
+
+=== File: D:\foodcare_app\foodcare_app\lib\screens\alerts\alerts_screen.dart ===
+import 'package:flutter/material.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import '../../models/product_model.dart';
+import '../../theme/theme_manager.dart';
+import '../../utils/helpers.dart';
+
+class AlertsScreen extends StatelessWidget {
+  const AlertsScreen({super.key});
+
+  CollectionReference get _productsCollection {
+    final user = FirebaseAuth.instance.currentUser;
+    final uid = user?.uid ?? 'guest';
+    return FirebaseFirestore.instance.collection('users').doc(uid).collection('products');
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return ValueListenableBuilder<Color>(
+      valueListenable: ThemeManager.themeColor,
+      builder: (context, primaryColor, _) {
+        return Scaffold(
+          backgroundColor: const Color(0xFF16121E),
+          appBar: AppBar(
+            title: const Text('Ø§Ù„ØªÙ†Ø¨ÙŠÙ‡Ø§Øª Ø§Ù„Ø°ÙƒÙŠØ© ðŸ””âœ¨', style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold)),
+            backgroundColor: Colors.transparent,
+            elevation: 0,
+            centerTitle: true,
+            iconTheme: const IconThemeData(color: Colors.white),
+          ),
+          body: Padding(
+            padding: const EdgeInsets.all(16.0),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Ù…Ù†ØªØ¬Ø§Øª ØªØ­ØªØ§Ø¬ Ø§Ù†ØªØ¨Ø§Ù‡ÙƒÙ Ø§Ù„Ø¢Ù† ðŸ’–',
+                  style: TextStyle(color: primaryColor, fontSize: 16, fontWeight: FontWeight.bold),
+                ),
+                const SizedBox(height: 12),
+                Expanded(
+                  child: StreamBuilder<QuerySnapshot>(
+                    stream: _productsCollection.snapshots(),
+                    builder: (context, snapshot) {
+                      if (snapshot.connectionState == ConnectionState.waiting) {
+                        return Center(child: CircularProgressIndicator(color: primaryColor));
+                      }
+                      final docs = snapshot.data?.docs ?? [];
+                      final allProducts = docs.map((d) => Product.fromMap(d.data() as Map<String, dynamic>)).toList();
+                      final urgentProducts = allProducts
+                          .where((p) => p.status == ProductStatus.expired || p.status == ProductStatus.expiringSoon)
+                          .toList();
+
+                      if (urgentProducts.isEmpty) {
+                        return Center(
+                          child: KawaiiFloatingWidget(
+                            child: Column(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                const Text('ðŸŒ¸ðŸŽ‰ðŸŒ¸', style: TextStyle(fontSize: 44)),
+                                const SizedBox(height: 12),
+                                Text('(ï¾‰â—•ãƒ®â—•)ï¾‰*:ï½¥ï¾Ÿâœ§', style: TextStyle(color: primaryColor, fontSize: 18, fontWeight: FontWeight.bold)),
+                                const SizedBox(height: 8),
+                                const Text('Ù„Ø§ ØªÙˆØ¬Ø¯ ØªÙ†Ø¨ÙŠÙ‡Ø§Øª Ø¹Ø§Ø¬Ù„Ø©!', style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold)),
+                                const SizedBox(height: 6),
+                                Text('Ø¬Ù…ÙŠØ¹ Ø£ØºØ±Ø§Ø¶ Ø«Ù„Ø§Ø¬ØªÙƒ ØªØ­Øª Ø§Ù„Ø¹Ù†Ø§ÙŠØ© ÙˆØ¨Ø­Ø§Ù„Ø© Ù…Ù…ØªØ§Ø²Ø© ÙÙŠ FoodCare âœ¨', style: TextStyle(color: Colors.grey.shade400, fontSize: 13)),
+                              ],
+                            ),
+                          ),
+                        );
+                      }
+
+                      return ListView.builder(
+                        itemCount: urgentProducts.length,
+                        itemBuilder: (context, index) {
+                          final product = urgentProducts[index];
+                          final isExpired = product.status == ProductStatus.expired;
+                          final alertColor = isExpired ? const Color(0xFFFF6B8B) : const Color(0xFFFFBE76);
+
+                          return KawaiiFadeSlide(
+                            index: index,
+                            child: Container(
+                              margin: const EdgeInsets.only(bottom: 12),
+                              padding: const EdgeInsets.all(14),
+                              decoration: BoxDecoration(
+                                color: const Color(0xFF1F1A2B),
+                                borderRadius: BorderRadius.circular(22),
+                                border: Border.all(color: alertColor.withValues(alpha: 0.5), width: 1.5),
+                                boxShadow: [
+                                  BoxShadow(color: alertColor.withValues(alpha: 0.12), blurRadius: 12),
+                                ],
+                              ),
+                              child: Row(
+                                children: [
+                                  KawaiiFloatingWidget(
+                                    child: Text(isExpired ? 'ðŸ¥€' : 'â³', style: const TextStyle(fontSize: 28)),
+                                  ),
+                                  const SizedBox(width: 14),
+                                  Expanded(
+                                    child: Column(
+                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      children: [
+                                        Text(product.name, style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold)),
+                                        const SizedBox(height: 4),
+                                        Text(
+                                          isExpired ? 'Ø§Ù†ØªÙ‡Øª ØµÙ„Ø§Ø­ÙŠØªÙ‡ Ø¨ØªØ§Ø±ÙŠØ® ${product.date}!' : 'ÙŠÙ†ØªÙ‡ÙŠ Ù‚Ø±ÙŠØ¨Ø§Ù‹ Ø¨ØªØ§Ø±ÙŠØ® ${product.date}ØŒ Ø§Ø³ØªÙ‡Ù„ÙƒÙŠÙ‡ Ø§Ù„ÙŠÙˆÙ….',
+                                          style: TextStyle(color: alertColor, fontSize: 12, fontWeight: FontWeight.w500),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                  Container(
+                                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                                    decoration: BoxDecoration(color: const Color(0xFF16121E), borderRadius: BorderRadius.circular(12)),
+                                    child: Text('Ã—${product.quantity}', style: TextStyle(color: primaryColor, fontSize: 12, fontWeight: FontWeight.bold)),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          );
+                        },
+                      );
+                    },
+                  ),
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+}
+
+=== File: D:\foodcare_app\foodcare_app\lib\screens\auth\login_screen.dart ===
+import 'package:flutter/material.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import '../../theme/theme_manager.dart';
+import '../home/home_screen.dart';
+
+class LoginScreen extends StatefulWidget {
+  final bool isPreview; // Ù…Ø¹Ø§Ù…Ù„ Ø®Ø§Øµ Ø¨ÙˆØ¶Ø¹ Ø§Ù„Ù…Ø¹Ø§ÙŠÙ†Ø© Ù…Ù† Ø§Ù„Ø¥Ø¹Ø¯Ø§Ø¯Ø§Øª
+  const LoginScreen({super.key, this.isPreview = false});
+
+  @override
+  State<LoginScreen> createState() => _LoginScreenState();
+}
+
+class _LoginScreenState extends State<LoginScreen> with SingleTickerProviderStateMixin {
+  bool isFridgeOpen = false;
+  bool isSignInSelected = true;
+  bool isForgotPassword = false;
+  bool isLoading = false;
+  bool obscurePassword = true;
+
+  final _emailController = TextEditingController();
+  final _passwordController = TextEditingController();
+  final _nameController = TextEditingController();
+
+  late AnimationController _animationController;
+  late Animation<double> _doorAnimation;
+  late Animation<double> _glowAnimation;
+
+  @override
+  void initState() {
+    super.initState();
+    _animationController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 500),
+    );
+
+    _doorAnimation = Tween<double>(begin: 0.0, end: -0.55).animate(
+      CurvedAnimation(parent: _animationController, curve: Curves.easeInOutBack),
+    );
+
+    _glowAnimation = Tween<double>(begin: 0.0, end: 1.0).animate(
+      CurvedAnimation(parent: _animationController, curve: Curves.easeInOut),
+    );
+  }
+
+  @override
+  void dispose() {
+    _animationController.dispose();
+    _emailController.dispose();
+    _passwordController.dispose();
+    _nameController.dispose();
+    super.dispose();
+  }
+
+  void _toggleFridge() {
+    setState(() {
+      isFridgeOpen = !isFridgeOpen;
+      if (isFridgeOpen) {
+        _animationController.forward();
+      } else {
+        _animationController.reverse();
+        isForgotPassword = false;
+      }
+    });
+  }
+
+  void _showMessage(String msg, {bool isError = true}) {
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(msg),
+        backgroundColor: isError ? Colors.redAccent : Colors.green,
+      ),
+    );
+  }
+
+  Future<void> _handleAuth() async {
+    // Ø¥Ø°Ø§ ÙƒÙ†Ø§ ÙÙŠ ÙˆØ¶Ø¹ Ø§Ù„Ù…Ø¹Ø§ÙŠÙ†Ø©ØŒ Ø¹Ù†Ø¯ Ø§Ù„Ø¶ØºØ· ÙŠØªÙ… Ù†Ù‚Ù„Ùƒ Ù…Ø¨Ø§Ø´Ø±Ø© Ù„Ù„Ø´Ø§Ø´Ø© Ø§Ù„Ø±Ø¦ÙŠØ³ÙŠØ© ÙÙˆØ±Ø§Ù‹ Ø¯ÙˆÙ† ØªØ­Ù‚Ù‚
+    if (widget.isPreview) {
+      Navigator.pushReplacement(
+        context,
+        MaterialPageRoute(builder: (_) => const HomeScreen()),
+      );
+      return;
+    }
+
+    final email = _emailController.text.trim();
+    final password = _passwordController.text.trim();
+
+    if (email.isEmpty || !email.contains('@')) {
+      _showMessage('ÙŠØ±Ø¬Ù‰ Ø¥Ø¯Ø®Ø§Ù„ Ø¨Ø±ÙŠØ¯ Ø¥Ù„ÙƒØªØ±ÙˆÙ†ÙŠ ØµØ­ÙŠØ­');
+      return;
+    }
+
+    setState(() => isLoading = true);
+
+    try {
+      if (isForgotPassword) {
+        await FirebaseAuth.instance.sendPasswordResetEmail(email: email);
+        _showMessage('ØªÙ… Ø¥Ø±Ø³Ø§Ù„ Ø±Ø§Ø¨Ø· Ø§Ø³ØªØ¹Ø§Ø¯Ø© ÙƒÙ„Ù…Ø© Ø§Ù„Ù…Ø±ÙˆØ± Ø¥Ù„Ù‰ Ø¨Ø±ÙŠØ¯ÙƒÙ âœ¨', isError: false);
+        setState(() => isForgotPassword = false);
+      } else if (isSignInSelected) {
+        await FirebaseAuth.instance.signInWithEmailAndPassword(email: email, password: password);
+        if (!mounted) return;
+        Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => const HomeScreen()));
+      } else {
+        if (password.length < 6) {
+          _showMessage('ÙƒÙ„Ù…Ø© Ø§Ù„Ù…Ø±ÙˆØ± ÙŠØ¬Ø¨ Ø£Ù† ØªÙƒÙˆÙ† 6 Ø£Ø­Ø±Ù Ø¹Ù„Ù‰ Ø§Ù„Ø£Ù‚Ù„');
+          setState(() => isLoading = false);
+          return;
+        }
+        final cred = await FirebaseAuth.instance.createUserWithEmailAndPassword(email: email, password: password);
+        if (_nameController.text.trim().isNotEmpty) {
+          await cred.user?.updateDisplayName(_nameController.text.trim());
+        }
+        if (!mounted) return;
+        Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => const HomeScreen()));
+      }
+    } on FirebaseAuthException catch (e) {
+      String message = 'Ø­Ø¯Ø« Ø®Ø·Ø£ØŒ ÙŠØ±Ø¬Ù‰ Ø§Ù„ØªØ­Ù‚Ù‚ Ù…Ù† Ø§Ù„Ø¨ÙŠØ§Ù†Ø§Øª.';
+      if (e.code == 'user-not-found') {
+        message = 'Ù„Ø§ ÙŠÙˆØ¬Ø¯ Ø­Ø³Ø§Ø¨ Ø¨Ù‡Ø°Ø§ Ø§Ù„Ø¨Ø±ÙŠØ¯ Ø§Ù„Ø¥Ù„ÙƒØªØ±ÙˆÙ†ÙŠ.';
+      } else if (e.code == 'wrong-password' || e.code == 'invalid-credential') {
+        message = 'Ø§Ù„Ø¨Ø±ÙŠØ¯ Ø£Ùˆ ÙƒÙ„Ù…Ø© Ø§Ù„Ù…Ø±ÙˆØ± ØºÙŠØ± ØµØ­ÙŠØ­Ø©.';
+      } else if (e.code == 'email-already-in-use') {
+        message = 'Ù‡Ø°Ø§ Ø§Ù„Ø¨Ø±ÙŠØ¯ Ù…Ø³ØªØ®Ø¯Ù… Ù…Ø³Ø¨Ù‚Ø§Ù‹.';
+      } else if (e.code == 'network-request-failed') {
+        message = 'ÙŠØ±Ø¬Ù‰ Ø§Ù„ØªØ­Ù‚Ù‚ Ù…Ù† Ø§ØªØµØ§Ù„ÙƒÙ Ø¨Ø§Ù„Ø¥Ù†ØªØ±Ù†Øª ÙˆØ§Ù„Ù…Ø­Ø§ÙˆÙ„Ø© Ù…Ø¬Ø¯Ø¯Ø§Ù‹ ðŸ“¡';
+      } else if (e.code == 'too-many-requests') {
+        message = 'ØªÙ… ØªØ¬Ø§ÙˆØ² Ø¹Ø¯Ø¯ Ø§Ù„Ù…Ø­Ø§ÙˆÙ„Ø§Øª Ø§Ù„Ù…Ø³Ù…ÙˆØ­ Ø¨Ù‡ØŒ ÙŠØ±Ø¬Ù‰ Ø§Ù„Ù…Ø­Ø§ÙˆÙ„Ø© Ù„Ø§Ø­Ù‚Ø§Ù‹.';
+      }
+      _showMessage(message);
+    } catch (e) {
+      _showMessage('Ø®Ø·Ø£ ØºÙŠØ± Ù…ØªÙˆÙ‚Ø¹: ${e.toString()}');
+    } finally {
+      if (mounted) setState(() => isLoading = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return ValueListenableBuilder<Color>(
+      valueListenable: ThemeManager.themeColor,
+      builder: (context, selectedColor, _) {
+        return Scaffold(
+          body: Stack(
+            children: [
+              Positioned(top: -50, left: -50, child: _buildGlowOrb(const Color(0xFFFF8FAB), 150, 0.15)),
+              Positioned(top: 100, right: -60, child: _buildGlowOrb(const Color(0xFFC77DFF), 180, 0.12)),
+              Positioned(bottom: -40, left: -30, child: _buildGlowOrb(const Color(0xFF80ED99), 160, 0.10)),
+              Positioned(bottom: 50, right: -40, child: _buildGlowOrb(const Color(0xFFFFB5A7), 170, 0.12)),
+
+              SafeArea(
+                child: Column(
+                  children: [
+                    const SizedBox(height: 16),
+                    if (widget.isPreview)
+                      Container(
+                        margin: const EdgeInsets.only(bottom: 8),
+                        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+                        decoration: BoxDecoration(
+                          color: selectedColor.withValues(alpha: 0.2),
+                          borderRadius: BorderRadius.circular(20),
+                          border: Border.all(color: selectedColor),
+                        ),
+                        child: Text(
+                          'ÙˆØ¶Ø¹ Ø§Ù„Ù…Ø¹Ø§ÙŠÙ†Ø© Ø§Ù„ÙÙˆØ±ÙŠØ© âœ¨',
+                          style: TextStyle(color: selectedColor, fontWeight: FontWeight.bold, fontSize: 12),
+                        ),
+                      ),
+                    Center(
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 8),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFF231D30).withValues(alpha: 0.9),
+                          borderRadius: BorderRadius.circular(30),
+                          border: Border.all(color: Colors.white.withValues(alpha: 0.08)),
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            ...ThemeManager.availableColors.map((color) => _buildColorOption(color, selectedColor)),
+                            const SizedBox(width: 12),
+                            Icon(Icons.auto_awesome, color: selectedColor, size: 20),
+                          ],
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+                    Center(
+                      child: SizedBox(
+                        height: 250,
+                        width: 280,
+                        child: Stack(
+                          alignment: Alignment.center,
+                          children: [
+                            AnimatedBuilder(
+                              animation: _glowAnimation,
+                              builder: (context, child) {
+                                return Opacity(
+                                  opacity: _glowAnimation.value,
+                                  child: CustomPaint(
+                                    size: const Size(280, 240),
+                                    painter: WideFridgeGlowPainter(color: selectedColor),
+                                  ),
+                                );
+                              },
+                            ),
+                            GestureDetector(
+                              onTap: _toggleFridge,
+                              child: Column(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  _buildCuteFridge(selectedColor),
+                                  const SizedBox(height: 12),
+                                  AnimatedContainer(
+                                    duration: const Duration(milliseconds: 250),
+                                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 5),
+                                    decoration: BoxDecoration(
+                                      color: const Color(0xFF231D30).withValues(alpha: 0.9),
+                                      borderRadius: BorderRadius.circular(20),
+                                      border: Border.all(
+                                        color: isFridgeOpen ? selectedColor.withValues(alpha: 0.6) : Colors.white12,
+                                      ),
+                                    ),
+                                    child: Text(
+                                      isFridgeOpen ? 'Ø§Ø¶ØºØ·ÙŠ Ù„Ù„Ø¥ØºÙ„Ø§Ù‚ ðŸ”’' : 'Ø§Ø¶ØºØ·ÙŠ Ù„ÙØªØ­ Ø§Ù„Ø«Ù„Ø§Ø¬Ø© âœ¨',
+                                      style: TextStyle(
+                                        fontSize: 11,
+                                        color: isFridgeOpen ? selectedColor : Colors.grey.shade400,
+                                        fontWeight: FontWeight.w500,
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+
+              AnimatedPositioned(
+                duration: const Duration(milliseconds: 450),
+                curve: Curves.easeInOutBack,
+                left: 0,
+                right: 0,
+                bottom: isFridgeOpen ? 0 : -470,
+                child: Container(
+                  height: 430,
+                  padding: const EdgeInsets.fromLTRB(26, 20, 26, 26),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF1F1A2B).withValues(alpha: 0.97),
+                    borderRadius: const BorderRadius.vertical(top: Radius.circular(36)),
+                    border: Border.all(color: selectedColor.withValues(alpha: 0.6), width: 2),
+                    boxShadow: [
+                      BoxShadow(color: selectedColor.withValues(alpha: 0.35), blurRadius: 35, spreadRadius: 8),
+                    ],
+                  ),
+                  child: SingleChildScrollView(
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Center(
+                          child: GestureDetector(
+                            onTap: _toggleFridge,
+                            child: Container(
+                              width: 40,
+                              height: 4,
+                              decoration: BoxDecoration(color: Colors.grey.shade600, borderRadius: BorderRadius.circular(10)),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(height: 14),
+                        if (widget.isPreview) ...[
+                          Row(
+                            children: [
+                              const Text('ÙˆØ¶Ø¹ Ø§Ù„Ù…Ø¹Ø§ÙŠÙ†Ø© Ø§Ù„ÙÙˆØ±ÙŠØ© âœ¨', style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: Colors.white)),
+                              const SizedBox(width: 8),
+                              Icon(Icons.visibility_rounded, color: selectedColor, size: 20),
+                            ],
+                          ),
+                          const SizedBox(height: 8),
+                          Text('ÙŠÙ…ÙƒÙ†ÙƒÙ Ø§Ù„Ø§Ù†ØªÙ‚Ø§Ù„ Ù…Ø¨Ø§Ø´Ø±Ø© Ø¥Ù„Ù‰ Ø§Ù„Ø´Ø§Ø´Ø© Ø§Ù„Ø±Ø¦ÙŠØ³ÙŠØ© Ù„Ù„Ø§Ø³ØªÙ…ØªØ§Ø¹ Ø¨Ø±Ø¤ÙŠØ© Ø§Ù„Ø«Ù„Ø§Ø¬Ø© Ù…Ù† Ø§Ù„Ø¯Ø§Ø®Ù„ ðŸ§ŠðŸ’–', style: TextStyle(fontSize: 13, color: Colors.grey.shade300, height: 1.5)),
+                          const SizedBox(height: 30),
+                          SizedBox(
+                            width: double.infinity,
+                            height: 50,
+                            child: ElevatedButton(
+                              onPressed: _handleAuth,
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: selectedColor,
+                                foregroundColor: const Color(0xFF16121E),
+                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
+                              ),
+                              child: const Text('Ø¯Ø®ÙˆÙ„ Ù…Ø¨Ø§Ø´Ø± Ù„Ù„Ø«Ù„Ø§Ø¬Ø© (Ø§Ù„Ø±Ø¦ÙŠØ³ÙŠØ©) ðŸš€', style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold)),
+                            ),
+                          ),
+                        ] else if (isForgotPassword) ...[
+                          Row(
+                            children: [
+                              const Text('Ø§Ø³ØªØ¹Ø§Ø¯Ø© ÙƒÙ„Ù…Ø© Ø§Ù„Ù…Ø±ÙˆØ± âœ¨', style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: Colors.white)),
+                              const SizedBox(width: 8),
+                              Icon(Icons.lock_reset, color: selectedColor, size: 20),
+                            ],
+                          ),
+                          const SizedBox(height: 4),
+                          Text('Ø£Ø¯Ø®Ù„ÙŠ Ø¨Ø±ÙŠØ¯ÙƒÙ Ø§Ù„Ø¥Ù„ÙƒØªØ±ÙˆÙ†ÙŠ Ù„Ø¥Ø±Ø³Ø§Ù„ Ø±Ø§Ø¨Ø· Ø§Ù„ØªØ¹ÙŠÙŠÙ†', style: TextStyle(fontSize: 12, color: Colors.grey.shade400)),
+                          const SizedBox(height: 18),
+                          TextField(
+                            controller: _emailController,
+                            decoration: InputDecoration(
+                              prefixIcon: Icon(Icons.email_outlined, color: selectedColor, size: 18),
+                              hintText: 'Ø§Ù„Ø¨Ø±ÙŠØ¯ Ø§Ù„Ø¥Ù„ÙƒØªØ±ÙˆÙ†ÙŠ',
+                              filled: true,
+                              fillColor: const Color(0xFF272136),
+                              border: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: BorderSide.none),
+                            ),
+                          ),
+                          const SizedBox(height: 18),
+                          SizedBox(
+                            width: double.infinity,
+                            height: 46,
+                            child: ElevatedButton(
+                              onPressed: isLoading ? null : _handleAuth,
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: selectedColor,
+                                foregroundColor: const Color(0xFF16121E),
+                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
+                              ),
+                              child: isLoading
+                                  ? const CircularProgressIndicator(color: Color(0xFF16121E))
+                                  : const Text('Ø¥Ø±Ø³Ø§Ù„ Ø§Ù„Ø±Ø§Ø¨Ø· ðŸŒ¸', style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold)),
+                            ),
+                          ),
+                          const SizedBox(height: 12),
+                          Center(
+                            child: GestureDetector(
+                              onTap: () => setState(() => isForgotPassword = false),
+                              child: Text('Ø§Ù„Ø¹ÙˆØ¯Ø© Ù„ØªØ³Ø¬ÙŠÙ„ Ø§Ù„Ø¯Ø®ÙˆÙ„', style: TextStyle(fontSize: 13, color: selectedColor, fontWeight: FontWeight.bold)),
+                            ),
+                          ),
+                        ] else ...[
+                          Row(
+                            children: [
+                              Text(
+                                isSignInSelected ? 'Ø£Ù‡Ù„Ø§Ù‹ Ø¨Ø¹ÙˆØ¯ØªÙƒÙ âœ¨' : 'Ø¥Ù†Ø´Ø§Ø¡ Ø­Ø³Ø§Ø¨ Ø¬Ø¯ÙŠØ¯ ðŸŒ¸',
+                                style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: Colors.white),
+                              ),
+                              const SizedBox(width: 8),
+                              Icon(Icons.favorite, color: selectedColor, size: 20),
+                            ],
+                          ),
+                          const SizedBox(height: 14),
+                          Container(
+                            height: 40,
+                            padding: const EdgeInsets.all(3),
+                            decoration: BoxDecoration(color: const Color(0xFF16121E), borderRadius: BorderRadius.circular(20)),
+                            child: Row(
+                              children: [
+                                Expanded(
+                                  child: GestureDetector(
+                                    onTap: () => setState(() => isSignInSelected = true),
+                                    child: Container(
+                                      decoration: BoxDecoration(
+                                        color: isSignInSelected ? const Color(0xFF2E263E) : Colors.transparent,
+                                        borderRadius: BorderRadius.circular(17),
+                                      ),
+                                      alignment: Alignment.center,
+                                      child: Text('ØªØ³Ø¬ÙŠÙ„ Ø§Ù„Ø¯Ø®ÙˆÙ„', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12, color: isSignInSelected ? selectedColor : Colors.grey.shade400)),
+                                    ),
+                                  ),
+                                ),
+                                Expanded(
+                                  child: GestureDetector(
+                                    onTap: () => setState(() => isSignInSelected = false),
+                                    child: Container(
+                                      decoration: BoxDecoration(
+                                        color: !isSignInSelected ? const Color(0xFF2E263E) : Colors.transparent,
+                                        borderRadius: BorderRadius.circular(17),
+                                      ),
+                                      alignment: Alignment.center,
+                                      child: Text('Ø­Ø³Ø§Ø¨ Ø¬Ø¯ÙŠØ¯', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12, color: !isSignInSelected ? selectedColor : Colors.grey.shade400)),
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                          const SizedBox(height: 12),
+                          if (!isSignInSelected) ...[
+                            TextField(
+                              controller: _nameController,
+                              decoration: InputDecoration(
+                                prefixIcon: Icon(Icons.badge_outlined, color: selectedColor, size: 18),
+                                hintText: 'Ø§Ù„Ø§Ø³Ù… Ø§Ù„ÙƒØ§Ù…Ù„',
+                                filled: true,
+                                fillColor: const Color(0xFF272136),
+                                border: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: BorderSide.none),
+                              ),
+                            ),
+                            const SizedBox(height: 10),
+                          ],
+                          TextField(
+                            controller: _emailController,
+                            decoration: InputDecoration(
+                              prefixIcon: Icon(Icons.email_outlined, color: selectedColor, size: 18),
+                              hintText: 'Ø§Ù„Ø¨Ø±ÙŠØ¯ Ø§Ù„Ø¥Ù„ÙƒØªØ±ÙˆÙ†ÙŠ',
+                              filled: true,
+                              fillColor: const Color(0xFF272136),
+                              border: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: BorderSide.none),
+                            ),
+                          ),
+                          const SizedBox(height: 10),
+                          TextField(
+                            controller: _passwordController,
+                            obscureText: obscurePassword,
+                            decoration: InputDecoration(
+                              prefixIcon: Icon(Icons.lock_outline, color: selectedColor, size: 18),
+                              suffixIcon: IconButton(
+                                icon: Icon(obscurePassword ? Icons.visibility_off_outlined : Icons.visibility_outlined, color: Colors.grey, size: 18),
+                                onPressed: () => setState(() => obscurePassword = !obscurePassword),
+                              ),
+                              hintText: 'ÙƒÙ„Ù…Ø© Ø§Ù„Ù…Ø±ÙˆØ±',
+                              filled: true,
+                              fillColor: const Color(0xFF272136),
+                              border: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: BorderSide.none),
+                            ),
+                          ),
+                          if (isSignInSelected) ...[
+                            const SizedBox(height: 6),
+                            Align(
+                              alignment: Alignment.centerLeft,
+                              child: GestureDetector(
+                                onTap: () => setState(() => isForgotPassword = true),
+                                child: Text('Ù†Ø³ÙŠØªÙ ÙƒÙ„Ù…Ø© Ø§Ù„Ù…Ø±ÙˆØ±ØŸ', style: TextStyle(fontSize: 11, color: selectedColor, fontWeight: FontWeight.w600)),
+                              ),
+                            ),
+                          ],
+                          const SizedBox(height: 16),
+                          SizedBox(
+                            width: double.infinity,
+                            height: 46,
+                            child: ElevatedButton(
+                              onPressed: isLoading ? null : _handleAuth,
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: selectedColor,
+                                foregroundColor: const Color(0xFF16121E),
+                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
+                              ),
+                              child: isLoading
+                                  ? const SizedBox(width: 22, height: 22, child: CircularProgressIndicator(color: Color(0xFF16121E), strokeWidth: 2))
+                                  : Text(isSignInSelected ? 'Ø¯Ø®ÙˆÙ„ âœ¨' : 'Ø¥Ù†Ø´Ø§Ø¡ Ø§Ù„Ø­Ø³Ø§Ø¨ ðŸŒ¸', style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold)),
+                            ),
+                          ),
+                        ],
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildGlowOrb(Color color, double size, double opacity) {
+    return Container(
+      width: size,
+      height: size,
+      decoration: BoxDecoration(
+        shape: BoxShape.circle,
+        gradient: RadialGradient(colors: [color.withValues(alpha: opacity), color.withValues(alpha: 0.0)]),
+      ),
+    );
+  }
+
+  Widget _buildCuteFridge(Color selectedColor) {
+    return SizedBox(
+      width: 150,
+      height: 175,
+      child: Stack(
+        alignment: Alignment.center,
+        children: [
+          Container(
+            width: 100,
+            height: 165,
+            decoration: BoxDecoration(
+              color: isFridgeOpen ? selectedColor.withValues(alpha: 0.25) : const Color(0xFF2A233A),
+              borderRadius: BorderRadius.circular(24),
+              border: Border.all(color: isFridgeOpen ? selectedColor : Colors.white24, width: 2.5),
+              boxShadow: isFridgeOpen ? [BoxShadow(color: selectedColor.withValues(alpha: 0.6), blurRadius: 30, spreadRadius: 5)] : [],
+            ),
+            child: isFridgeOpen ? _buildFridgeInterior(selectedColor) : _buildClosedFridgeFront(selectedColor),
+          ),
+          Positioned(
+            right: 18,
+            child: AnimatedBuilder(
+              animation: _doorAnimation,
+              builder: (context, child) {
+                return Transform(
+                  alignment: Alignment.centerLeft,
+                  transform: Matrix4.identity()..setEntry(3, 2, 0.002)..rotateY(_doorAnimation.value),
+                  child: Container(
+                    width: 32,
+                    height: 158,
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF2E263E),
+                      borderRadius: const BorderRadius.horizontal(right: Radius.circular(16)),
+                      border: Border.all(color: selectedColor.withValues(alpha: 0.7), width: 2),
+                    ),
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                      children: [
+                        Container(width: 16, height: 4, decoration: BoxDecoration(color: selectedColor, borderRadius: BorderRadius.circular(4))),
+                        Container(width: 16, height: 4, decoration: BoxDecoration(color: selectedColor, borderRadius: BorderRadius.circular(4))),
+                      ],
+                    ),
+                  ),
+                );
+              },
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildFridgeInterior(Color selectedColor) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 10),
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Container(
+            width: 28,
+            height: 5,
+            decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(10), boxShadow: [BoxShadow(color: selectedColor, blurRadius: 10, spreadRadius: 2)]),
+          ),
+          Row(mainAxisAlignment: MainAxisAlignment.spaceAround, children: [Icon(Icons.icecream_outlined, color: selectedColor, size: 18), const Icon(Icons.local_cafe_outlined, color: Colors.white70, size: 16)]),
+          Divider(color: selectedColor.withValues(alpha: 0.5), thickness: 1.5, height: 4),
+          Row(mainAxisAlignment: MainAxisAlignment.spaceAround, children: [const Icon(Icons.cake_outlined, color: Colors.white70, size: 18), Icon(Icons.favorite, color: selectedColor, size: 15)]),
+          Divider(color: selectedColor.withValues(alpha: 0.5), thickness: 1.5, height: 4),
+          Container(height: 22, width: double.infinity, decoration: BoxDecoration(color: selectedColor.withValues(alpha: 0.2), borderRadius: BorderRadius.circular(6), border: Border.all(color: selectedColor.withValues(alpha: 0.4)))),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildClosedFridgeFront(Color selectedColor) {
+    return Column(
+      children: [
+        Expanded(
+          flex: 3,
+          child: Stack(
+            children: [
+              Positioned(left: 10, bottom: 8, child: Container(width: 4, height: 18, decoration: BoxDecoration(color: selectedColor.withValues(alpha: 0.8), borderRadius: BorderRadius.circular(4)))),
+              Positioned(right: 12, top: 12, child: Icon(Icons.favorite, color: selectedColor.withValues(alpha: 0.6), size: 13)),
+            ],
+          ),
+        ),
+        Container(height: 2, color: Colors.white12),
+        Expanded(
+          flex: 6,
+          child: Stack(
+            children: [
+              Positioned(left: 10, top: 12, child: Container(width: 4, height: 32, decoration: BoxDecoration(color: selectedColor.withValues(alpha: 0.8), borderRadius: BorderRadius.circular(4)))),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildColorOption(Color color, Color selectedColor) {
+    bool isSelected = selectedColor == color;
+    return GestureDetector(
+      onTap: () => ThemeManager.updateTheme(color),
+      child: Container(
+        margin: const EdgeInsets.symmetric(horizontal: 5),
+        padding: const EdgeInsets.all(2.5),
+        decoration: BoxDecoration(shape: BoxShape.circle, border: Border.all(color: isSelected ? Colors.white : Colors.transparent, width: 2)),
+        child: Container(width: 18, height: 18, decoration: BoxDecoration(color: color, shape: BoxShape.circle)),
+      ),
+    );
+  }
+}
+
+class WideFridgeGlowPainter extends CustomPainter {
+  final Color color;
+  WideFridgeGlowPainter({required this.color});
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final paint = Paint()
+      ..shader = RadialGradient(
+        center: Alignment.center,
+        radius: 0.75,
+        colors: [color.withValues(alpha: 0.45), color.withValues(alpha: 0.18), color.withValues(alpha: 0.0)],
+        stops: const [0.0, 0.5, 1.0],
+      ).createShader(Rect.fromLTWH(0, 0, size.width, size.height));
+    canvas.drawOval(Rect.fromLTWH(0, 0, size.width, size.height), paint);
+  }
+
+  @override
+  bool shouldRepaint(covariant WideFridgeGlowPainter oldDelegate) => true;
+}
+
+=== File: D:\foodcare_app\foodcare_app\lib\screens\home\home_screen.dart ===
+import 'package:flutter/material.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:firebase_ai/firebase_ai.dart';
+import '../../screens/add_product/add_product_screen.dart';
+import '../../models/product_model.dart';
+import '../../screens/alerts/alerts_screen.dart';
+import '../../screens/settings/settings_screen.dart';
+import '../../screens/shopping/shopping_list_screen.dart';
+import '../../screens/barcode_scanner_screen.dart';
+import '../../theme/theme_manager.dart';
+import '../../utils/helpers.dart';
+
+class HomeScreen extends StatefulWidget {
+  const HomeScreen({super.key});
+
+  @override
+  State<HomeScreen> createState() => _HomeScreenState();
+}
+
+class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateMixin {
+  final Set<String> _selectedDocIds = {};
+  late AnimationController _fridgeGlowController;
+  late Animation<double> _glowAnimation;
+
+  @override
+  void initState() {
+    super.initState();
+    _fridgeGlowController = AnimationController(
+      vsync: this,
+      duration: const Duration(seconds: 2),
+    )..repeat(reverse: true);
+
+    _glowAnimation = Tween<double>(begin: 0.35, end: 0.85).animate(
+      CurvedAnimation(parent: _fridgeGlowController, curve: Curves.easeInOut),
+    );
+  }
+
+  @override
+  void dispose() {
+    _fridgeGlowController.dispose();
+    super.dispose();
+  }
+
+  CollectionReference get _productsCollection {
+    final user = FirebaseAuth.instance.currentUser;
+    final uid = user?.uid ?? 'guest';
+    return FirebaseFirestore.instance.collection('users').doc(uid).collection('products');
+  }
+
+  Future<void> _openChefChat(List<QueryDocumentSnapshot> docs, Color primaryColor) async {
+    if (docs.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Ø«Ù„Ø§Ø¬ØªÙƒ ÙØ§Ø¶ÙŠØ© Ø­Ø§Ù„ÙŠØ§Ù‹ØŒ Ø£Ø¶ÙŠÙÙŠ Ø´ÙˆÙŠØ© Ø£ØºØ±Ø§Ø¶ Ù„Ù†Ù‚ØªØ±Ø­ Ø¹Ù„ÙŠÙƒÙ Ø£ÙƒÙ„Ø©! ðŸ›’')),
+      );
+      return;
+    }
+
+    final targetDocs = _selectedDocIds.isNotEmpty
+        ? docs.where((d) => _selectedDocIds.contains(d.id)).toList()
+        : docs;
+
+    final targetProducts = targetDocs
+        .map((d) => Product.fromMap(d.data() as Map<String, dynamic>))
+        .toList();
+
+    final validProducts = targetProducts
+        .where((p) => p.status != ProductStatus.expired)
+        .toList();
+
+    if (validProducts.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          backgroundColor: const Color(0xFF2A223D),
+          content: Text(
+            'ÙƒÙ„ Ø§Ù„Ø¹Ù†Ø§ØµØ± Ø§Ù„Ù…Ø­Ø¯Ø¯Ø© Ù…Ù†ØªÙ‡ÙŠØ© Ø§Ù„ØµÙ„Ø§Ø­ÙŠØ© ðŸ¥€! Ø§Ø®ØªØ§Ø±ÙŠ Ù…Ù†ØªØ¬Ø§Øª Ø·Ø§Ø²Ø¬Ø© Ù„Ø­Ù…Ø§ÙŠØ© ØµØ­ØªÙƒÙ ðŸ’–',
+            style: TextStyle(color: primaryColor, fontWeight: FontWeight.bold),
+          ),
+        ),
+      );
+      return;
+    }
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (context) => _ChefChatSheet(
+        products: validProducts,
+        primaryColor: primaryColor,
+      ),
+    );
+  }
+
+  Future<void> _restockProduct(String docId, String productName, Color primaryColor) async {
+    final newDate = DateTime.now().add(const Duration(days: 7));
+    final formattedDate =
+        '${newDate.year}-${newDate.month.toString().padLeft(2, '0')}-${newDate.day.toString().padLeft(2, '0')}';
+    await _productsCollection.doc(docId).update({'date': formattedDate, 'status': 'fresh'});
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          backgroundColor: const Color(0xFF1F1A2B),
+          content: Text('ØªÙ… ØªØ¬Ø¯ÙŠØ¯ $productName Ù„Ù…Ø¯Ø© Ø£Ø³Ø¨ÙˆØ¹ Ø¥Ø¶Ø§ÙÙŠ Ø¨Ù†Ø¬Ø§Ø­! ðŸ”„âœ¨', style: TextStyle(color: primaryColor)),
+        ),
+      );
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return ValueListenableBuilder<Color>(
+      valueListenable: ThemeManager.themeColor,
+      builder: (context, primaryColor, _) {
+        return Scaffold(
+          backgroundColor: const Color(0xFF110E17),
+          appBar: AppBar(
+            title: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Text('FoodCare ðŸ§Š', style: TextStyle(color: Colors.white, fontSize: 22, fontWeight: FontWeight.bold)),
+                const SizedBox(width: 6),
+                Icon(Icons.auto_awesome, color: primaryColor, size: 20),
+              ],
+            ),
+            backgroundColor: Colors.transparent,
+            elevation: 0,
+            centerTitle: true,
+            actions: [
+              if (_selectedDocIds.isNotEmpty)
+                IconButton(
+                  icon: Icon(Icons.deselect, color: primaryColor),
+                  tooltip: 'Ø¥Ù„ØºØ§Ø¡ Ø§Ù„ØªØ­Ø¯ÙŠØ¯',
+                  onPressed: () => setState(() => _selectedDocIds.clear()),
+                ),
+              IconButton(
+                icon: Icon(Icons.qr_code_scanner_rounded, color: primaryColor),
+                tooltip: 'Ù…Ø³Ø­ Ø§Ù„Ø¨Ø§Ø±ÙƒÙˆØ¯',
+                onPressed: () async {
+                  final scannedCode = await Navigator.push(
+                    context,
+                    MaterialPageRoute(builder: (_) => const BarcodeScannerScreen()),
+                  );
+                  if (scannedCode != null && context.mounted) {
+                    showDialog(
+                      context: context,
+                      builder: (context) => AlertDialog(
+                        backgroundColor: const Color(0xFF1F1A2B),
+                        title: const Text('Ù†ØªÙŠØ¬Ø© Ø§Ù„Ø¨Ø§Ø±ÙƒÙˆØ¯', style: TextStyle(color: Colors.white)),
+                        content: Text('Ø§Ù„ÙƒÙˆØ¯ Ø§Ù„Ù…Ù…Ø³ÙˆØ­: $scannedCode', style: const TextStyle(color: Colors.white70)),
+                        actions: [
+                          TextButton(
+                            onPressed: () => Navigator.pop(context),
+                            child: Text('Ø­Ø³Ù†Ø§Ù‹', style: TextStyle(color: primaryColor)),
+                          ),
+                        ],
+                      ),
+                    );
+                  }
+                },
+              ),
+              IconButton(
+                icon: Icon(Icons.shopping_cart_outlined, color: primaryColor),
+                tooltip: 'Ù‚Ø§Ø¦Ù…Ø© Ø§Ù„ØªØ³ÙˆÙ‚',
+                onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const ShoppingListScreen())),
+              ),
+              IconButton(
+                icon: Icon(Icons.notifications_active_outlined, color: primaryColor),
+                tooltip: 'Ø§Ù„ØªÙ†Ø¨ÙŠÙ‡Ø§Øª',
+                onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const AlertsScreen())),
+              ),
+              IconButton(
+                icon: const Icon(Icons.settings_outlined, color: Colors.white70),
+                tooltip: 'Ø§Ù„Ø¥Ø¹Ø¯Ø§Ø¯Ø§Øª',
+                onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const SettingsScreen())),
+              ),
+            ],
+          ),
+          body: AnimatedBuilder(
+            animation: _glowAnimation,
+            builder: (context, child) {
+              return Container(
+                decoration: BoxDecoration(
+                  gradient: RadialGradient(
+                    center: Alignment.topCenter,
+                    radius: 1.3,
+                    colors: [
+                      primaryColor.withValues(alpha: _glowAnimation.value * 0.3),
+                      const Color(0xFF16121E),
+                      const Color(0xFF0D0A12),
+                    ],
+                  ),
+                ),
+                child: child,
+              );
+            },
+            child: StreamBuilder<QuerySnapshot>(
+              stream: _productsCollection.snapshots(),
+              builder: (context, snapshot) {
+                if (snapshot.connectionState == ConnectionState.waiting) {
+                  return Center(child: CircularProgressIndicator(color: primaryColor));
+                }
+                final docs = snapshot.data?.docs ?? [];
+                final productsList = docs.map((d) => Product.fromMap(d.data() as Map<String, dynamic>)).toList();
+
+                return Column(
+                  children: [
+                    // Ù„ÙˆØ­Ø© Ø§Ù„ØªØ­ÙƒÙ… Ø§Ù„Ø¹Ù„ÙˆÙŠØ© Ø§Ù„Ø«Ù„Ø§Ø¬Ø© Ø§Ù„Ø°ÙƒÙŠØ© Ø¨ØªØµÙ…ÙŠÙ… ÙØ§Ø¦Ù‚ Ø§Ù„Ø¬Ù…Ø§Ù„
+                    Container(
+                      margin: const EdgeInsets.all(16),
+                      padding: const EdgeInsets.all(16),
+                      decoration: BoxDecoration(
+                        gradient: LinearGradient(
+                          colors: [
+                            const Color(0xFF221A30),
+                            const Color(0xFF161122),
+                            primaryColor.withValues(alpha: 0.15),
+                          ],
+                          begin: Alignment.topLeft,
+                          end: Alignment.bottomRight,
+                        ),
+                        borderRadius: BorderRadius.circular(28),
+                        border: Border.all(color: primaryColor.withValues(alpha: 0.6), width: 1.8),
+                        boxShadow: [
+                          BoxShadow(color: primaryColor.withValues(alpha: 0.28), blurRadius: 24, spreadRadius: 2),
+                        ],
+                      ),
+                      child: Row(
+                        children: [
+                          KawaiiFloatingWidget(
+                            child: Container(
+                              padding: const EdgeInsets.all(12),
+                              decoration: BoxDecoration(
+                                color: primaryColor.withValues(alpha: 0.22),
+                                shape: BoxShape.circle,
+                                border: Border.all(color: primaryColor, width: 1.5),
+                              ),
+                              child: const Text('âœ¨', style: TextStyle(fontSize: 24)),
+                            ),
+                          ),
+                          const SizedBox(width: 14),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  productsList.isEmpty ? 'Ø§Ù„Ø«Ù„Ø§Ø¬Ø© ÙØ§Ø±ØºØ© ØªÙ…Ø§Ù…Ø§Ù‹ ðŸ¥º' : 'Ø¥Ø¶Ø§Ø¡Ø© Ø«Ù„Ø§Ø¬Ø© FoodCare Ù†Ø´Ø·Ø© ðŸ’¡',
+                                  style: TextStyle(color: primaryColor, fontSize: 13, fontWeight: FontWeight.bold),
+                                ),
+                                const SizedBox(height: 3),
+                                Text(
+                                  _selectedDocIds.isEmpty ? 'Ø§Ø®ØªØ§Ø±ÙŠ Ø£ØºØ±Ø§Ø¶ Ù„ØªØ­Ø¶ÙŠØ± ÙˆØ¬Ø¨ØªÙƒÙ ðŸ‘©â€ðŸ³' : 'ØªÙ… Ø§Ø®ØªÙŠØ§Ø± ${_selectedDocIds.length} Ù…ÙƒÙˆÙ†Ø§Øª Ù„Ù„Ø·Ø¨Ø® ðŸ’–',
+                                  style: const TextStyle(color: Colors.white70, fontSize: 12),
+                                ),
+                              ],
+                            ),
+                          ),
+                          ElevatedButton.icon(
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: primaryColor,
+                              foregroundColor: const Color(0xFF110E17),
+                              elevation: 8,
+                              shadowColor: primaryColor.withValues(alpha: 0.5),
+                              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
+                            ),
+                            onPressed: () => _openChefChat(docs, primaryColor),
+                            icon: const Icon(Icons.restaurant_menu_rounded, size: 16),
+                            label: const Text('Ø§Ø³Ø£Ù„ÙŠ Ø§Ù„Ø´ÙŠÙ', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12)),
+                          ),
+                        ],
+                      ),
+                    ),
+
+                    // Ù…Ø­ØªÙˆÙ‰ Ø§Ù„Ø«Ù„Ø§Ø¬Ø© Ø§Ù„Ù…Ø¶ÙŠØ¡
+                    Expanded(
+                      child: docs.isEmpty
+                          ? Center(
+                              child: KawaiiFloatingWidget(
+                                child: Column(
+                                  mainAxisAlignment: MainAxisAlignment.center,
+                                  children: [
+                                    Icon(Icons.kitchen_rounded, size: 90, color: primaryColor.withValues(alpha: 0.4)),
+                                    const SizedBox(height: 16),
+                                    const Text('Ù„Ø§ ØªÙˆØ¬Ø¯ Ø£ØºØ±Ø§Ø¶ Ø¯Ø§Ø®Ù„ Ø§Ù„Ø«Ù„Ø§Ø¬Ø©!', style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold)),
+                                    const SizedBox(height: 6),
+                                    Text('Ø§Ø¶ØºØ·ÙŠ Ø¹Ù„Ù‰ Ø§Ù„Ø²Ø± Ø¨Ø§Ù„Ø£Ø³ÙÙ„ Ù„Ø¥Ø¶Ø§ÙØ© Ù…Ù†ØªØ¬Ø§ØªÙƒÙ ðŸ›’', style: TextStyle(color: primaryColor, fontSize: 12)),
+                                  ],
+                                ),
+                              ),
+                            )
+                          : ListView.builder(
+                              padding: const EdgeInsets.fromLTRB(16, 0, 16, 90),
+                              itemCount: docs.length,
+                              itemBuilder: (context, index) {
+                                final doc = docs[index];
+                                final data = doc.data() as Map<String, dynamic>;
+                                final product = Product.fromMap(data);
+                                final docId = doc.id;
+                                final statusColor = AppHelpers.getStatusColor(product.status);
+                                final needsRestock = product.status != ProductStatus.fresh;
+                                final isSelected = _selectedDocIds.contains(docId);
+
+                                return KawaiiFadeSlide(
+                                  index: index,
+                                  child: GestureDetector(
+                                    onTap: () {
+                                      if (product.status == ProductStatus.expired) {
+                                        ScaffoldMessenger.of(context).showSnackBar(
+                                          const SnackBar(content: Text('Ù‡Ø°Ø§ Ø§Ù„Ù…Ù†ØªØ¬ Ù…Ù†ØªÙ‡ÙŠ Ø§Ù„ØµÙ„Ø§Ø­ÙŠØ© ÙˆÙ„Ø§ ÙŠÙ…ÙƒÙ† Ø§Ø®ØªÙŠØ§Ø±Ù‡ Ù„Ù„Ø·Ø¨Ø® ðŸ¥€')),
+                                        );
+                                        return;
+                                      }
+                                      setState(() {
+                                        if (isSelected) {
+                                          _selectedDocIds.remove(docId);
+                                        } else {
+                                          _selectedDocIds.add(docId);
+                                        }
+                                      });
+                                    },
+                                    child: AnimatedContainer(
+                                      duration: const Duration(milliseconds: 300),
+                                      margin: const EdgeInsets.only(bottom: 14),
+                                      padding: const EdgeInsets.all(16),
+                                      decoration: BoxDecoration(
+                                        color: isSelected
+                                            ? primaryColor.withValues(alpha: 0.22)
+                                            : const Color(0xFF1B1626).withValues(alpha: 0.92),
+                                        borderRadius: BorderRadius.circular(26),
+                                        border: Border.all(
+                                          color: isSelected ? primaryColor : statusColor.withValues(alpha: 0.5),
+                                          width: isSelected ? 2.5 : 1.5,
+                                        ),
+                                        boxShadow: [
+                                          BoxShadow(
+                                            color: isSelected ? primaryColor.withValues(alpha: 0.35) : Colors.black.withValues(alpha: 0.25),
+                                            blurRadius: 18,
+                                            offset: const Offset(0, 6),
+                                          ),
+                                        ],
+                                      ),
+                                      child: Row(
+                                        children: [
+                                          Icon(
+                                            isSelected ? Icons.check_circle_rounded : Icons.circle_outlined,
+                                            color: isSelected ? primaryColor : Colors.grey.shade600,
+                                            size: 24,
+                                          ),
+                                          const SizedBox(width: 12),
+                                          Container(
+                                            padding: const EdgeInsets.all(12),
+                                            decoration: BoxDecoration(
+                                              color: statusColor.withValues(alpha: 0.15),
+                                              borderRadius: BorderRadius.circular(18),
+                                            ),
+                                            child: Text(AppHelpers.getProductEmoji(product.name), style: const TextStyle(fontSize: 26)),
+                                          ),
+                                          const SizedBox(width: 14),
+                                          Expanded(
+                                            child: Column(
+                                              crossAxisAlignment: CrossAxisAlignment.start,
+                                              children: [
+                                                Text(product.name, style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold)),
+                                                const SizedBox(height: 4),
+                                                Text('Ø§Ù„Ø§Ù†ØªÙ‡Ø§Ø¡: ${product.date}', style: TextStyle(color: Colors.grey.shade400, fontSize: 12)),
+                                                const SizedBox(height: 4),
+                                                Container(
+                                                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                                                  decoration: BoxDecoration(
+                                                    color: statusColor.withValues(alpha: 0.15),
+                                                    borderRadius: BorderRadius.circular(8),
+                                                  ),
+                                                  child: Text(AppHelpers.getStatusText(product.status), style: TextStyle(color: statusColor, fontSize: 11, fontWeight: FontWeight.bold)),
+                                                ),
+                                              ],
+                                            ),
+                                          ),
+                                          if (needsRestock)
+                                            IconButton(
+                                              icon: Icon(Icons.refresh_rounded, color: primaryColor, size: 22),
+                                              tooltip: 'ØªØ¬Ø¯ÙŠØ¯ Ø§Ù„Ù…Ù†ØªØ¬',
+                                              onPressed: () => _restockProduct(docId, product.name, primaryColor),
+                                            ),
+                                          Container(
+                                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                                            decoration: BoxDecoration(color: const Color(0xFF110E17), borderRadius: BorderRadius.circular(12)),
+                                            child: Text('Ã—${product.quantity}', style: TextStyle(color: primaryColor, fontSize: 13, fontWeight: FontWeight.bold)),
+                                          ),
+                                          IconButton(
+                                            icon: Icon(Icons.edit_outlined, color: primaryColor, size: 20),
+                                            onPressed: () async {
+                                              final updatedProduct = await Navigator.push(
+                                                context,
+                                                MaterialPageRoute(builder: (_) => AddProductScreen(existingProduct: product)),
+                                              );
+                                              if (updatedProduct != null && updatedProduct is Product) {
+                                                await _productsCollection.doc(docId).update(updatedProduct.toMap());
+                                              }
+                                            },
+                                          ),
+                                          IconButton(
+                                            icon: const Icon(Icons.delete_outline, color: Colors.redAccent, size: 20),
+                                            onPressed: () async {
+                                              _selectedDocIds.remove(docId);
+                                              await _productsCollection.doc(docId).delete();
+                                            },
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                  ),
+                                );
+                              },
+                            ),
+                    ),
+                  ],
+                );
+              },
+            ),
+          ),
+          floatingActionButton: FloatingActionButton.extended(
+            backgroundColor: primaryColor,
+            elevation: 12,
+            onPressed: () async {
+              final result = await Navigator.push(context, MaterialPageRoute(builder: (_) => const AddProductScreen()));
+              if (result != null && result is Product) {
+                await _productsCollection.add(result.toMap());
+              }
+            },
+            icon: const Icon(Icons.add_rounded, color: Color(0xFF110E17), size: 28),
+            label: const Text('Ø¥Ø¶Ø§ÙØ© Ù„Ù„Ø«Ù„Ø§Ø¬Ø©', style: TextStyle(color: Color(0xFF110E17), fontWeight: FontWeight.bold, fontSize: 15)),
+          ),
+        );
+      },
+    );
+  }
+}
+
+// Ù†Ø§ÙØ°Ø© Ø§Ù„Ø´ÙŠÙ Ø§Ù„Ø°ÙƒÙŠ Ø§Ù„ØªÙØ§Ø¹Ù„ÙŠØ©
+class _ChefChatSheet extends StatefulWidget {
+  final List<Product> products;
+  final Color primaryColor;
+
+  const _ChefChatSheet({required this.products, required this.primaryColor});
+
+  @override
+  State<_ChefChatSheet> createState() => _ChefChatSheetState();
+}
+
+class _ChefChatSheetState extends State<_ChefChatSheet> {
+  final TextEditingController _msgController = TextEditingController();
+  final ScrollController _scrollController = ScrollController();
+  final List<dynamic> _messages = [];
+  late ChatSession _chatSession;
+  bool _isTyping = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _initChefChat();
+  }
+
+  Future<void> _initChefChat() async {
+    try {
+      final model = FirebaseAI.googleAI().generativeModel(
+        model: 'gemini-3-flash-preview',
+      );
+      _chatSession = model.startChat();
+
+      final ingredientsList = widget.products.map((p) {
+        final urgency = p.status != ProductStatus.fresh ? '(ÙŠÙ†ØªÙ‡ÙŠ Ù‚Ø±ÙŠØ¨Ø§Ù‹ØŒ ÙŠÙØ¶Ù„ Ø§Ø³ØªØ®Ø¯Ø§Ù…Ù‡ Ø£ÙˆÙ„Ø§Ù‹)' : '';
+        return '- ${p.name} (Ø§Ù„ÙƒÙ…ÙŠØ©: ${p.quantity}) $urgency';
+      }).join('\n');
+
+      final initialPrompt = '''
+Ø£Ù†Øª Ø´ÙŠÙ Ø°ÙƒÙŠ ÙˆÙ…Ø³Ø§Ø¹Ø¯ Ù…Ø·Ø¨Ø® Ù…Ø­ØªØ±Ù Ù„Ø·ÙŠÙ ÙˆÙƒÙŠÙˆØª Ù„ØªØ·Ø¨ÙŠÙ‚ FoodCare (Ø§Ù„Ø¹Ù†Ø§ÙŠØ© Ø§Ù„Ø°ÙƒÙŠØ© Ø¨Ø§Ù„Ø·Ø¹Ø§Ù…).
+Ù‡Ø°Ù‡ Ù‡ÙŠ Ø§Ù„Ù‚Ø§Ø¦Ù…Ø© Ø§Ù„ØªÙŠ Ø£Ø±Ø³Ù„ØªÙ‡Ø§ Ø§Ù„Ù…Ø³ØªØ®Ø¯Ù…Ø©:
+$ingredientsList
+
+Ù‚ÙˆØ§Ø¹Ø¯ ØµØ§Ø±Ù…Ø© Ø¬Ø¯Ø§Ù‹ ÙŠØ¬Ø¨ Ø§Ù„Ø§Ù„ØªØ²Ø§Ù… Ø¨Ù‡Ø§:
+1. ØªØ¬Ø§Ù‡Ù„ ØªÙ…Ø§Ù…Ø§Ù‹ ÙˆÙ„Ø§ ØªØ³ØªØ®Ø¯Ù… Ø£ÙŠ Ù…Ø§Ø¯Ø© ØºÙŠØ± Ù‚Ø§Ø¨Ù„Ø© Ù„Ù„Ø§Ø³ØªÙ‡Ù„Ø§Ùƒ Ø§Ù„Ø¨Ø´Ø±ÙŠ Ø£Ùˆ ØºÙŠØ± ØºØ°Ø§Ø¦ÙŠØ© (Ù…Ø«Ù„: Ø§Ù„Ø±Ù…Ù„ØŒ Ø§Ù„ØªØ±Ø§Ø¨ØŒ Ø§Ù„Ø¹Ø·ÙˆØ±ØŒ Ø§Ù„Ù…ÙƒÙŠØ§Ø¬ØŒ Ø§Ù„Ù…Ù†Ø¸ÙØ§ØªØŒ Ø§Ù„ØµØ§Ø¨ÙˆÙ†ØŒ Ø§Ù„Ø¨Ù„Ø§Ø³ØªÙŠÙƒØŒ Ø§Ù„Ø£Ø¯ÙˆÙŠØ©).
+2. Ø§Ø³ØªØ®Ø¯Ù… ÙÙ‚Ø· Ø§Ù„Ù…ÙƒÙˆÙ†Ø§Øª Ø§Ù„ØºØ°Ø§Ø¦ÙŠØ© Ø§Ù„Ø·Ø§Ø²Ø¬Ø© ÙˆØ§Ù„ØµØ§Ù„Ø­Ø© Ù„Ù„Ø£ÙƒÙ„ØŒ ÙˆØ£Ø¹Ø·Ù Ø§Ù„Ø£ÙˆÙ„ÙˆÙŠØ© Ù„Ù…Ø§ ÙŠÙ†ØªÙ‡ÙŠ ØªØ§Ø±ÙŠØ®Ù‡ Ù‚Ø±ÙŠØ¨Ø§Ù‹ ØªØ­Øª Ø±Ø¹Ø§ÙŠØ© FoodCare.
+3. Ø§ÙƒØªØ¨ Ø§Ù„ÙˆØµÙØ© Ø¨Ø§Ù„Ù„ØºØ© Ø§Ù„Ø¹Ø±Ø¨ÙŠØ© Ø¨Ø£Ø³Ù„ÙˆØ¨ Ù„Ø·ÙŠÙ ÙˆÙ…Ø®ØªØµØ± (Ø§Ø³Ù… Ø§Ù„ÙˆØµÙØ©ØŒ Ø§Ù„Ù…ÙƒÙˆÙ†Ø§Øª Ø§Ù„Ù…Ø³ØªØ®Ø¯Ù…Ø©ØŒ ÙˆØ®Ø·ÙˆØ§Øª Ø§Ù„ØªØ­Ø¶ÙŠØ± Ø§Ù„Ø³Ø±ÙŠØ¹Ø© ÙÙŠ Ù†Ù‚Ø§Ø·) Ø¨Ø¯ÙˆÙ† Ø§Ø³ØªØ®Ø¯Ø§Ù… ÙƒÙ„Ù…Ø© Ø£Ù†Ù…ÙŠ Ù†Ù‡Ø§Ø¦ÙŠØ§Ù‹.
+4. ÙÙŠ Ù†Ù‡Ø§ÙŠØ© Ø±Ø¯ÙƒØŒ Ø§Ø³Ø£Ù„Ù‡Ø§ Ø¨Ù„Ø·Ù Ø¥Ø°Ø§ ÙƒØ§Ù†Øª ØªØ±ÙŠØ¯ ØªØ¹Ø¯ÙŠÙ„ Ø£ÙŠ Ù…ÙƒÙˆÙ† Ø£Ùˆ Ù„Ø¯ÙŠÙ‡Ø§ Ø³Ø¤Ø§Ù„ Ø­ÙˆÙ„ Ø§Ù„ÙˆØµÙØ©.
+''';
+
+      final response = await _chatSession.sendMessage(Content.text(initialPrompt));
+      if (!mounted) return;
+      setState(() {
+        _messages.add({
+          'role': 'chef',
+          'text': response.text ?? 'Ø¹Ø°Ø±Ø§Ù‹ØŒ Ù„Ù… Ø£ØªÙ…ÙƒÙ† Ù…Ù† ØªØ­Ø¶ÙŠØ± Ø§Ù„ÙˆØµÙØ© Ø§Ù„Ø¢Ù† (ï½¡â€¢Ìï¸¿â€¢Ì€ï½¡)',
+        });
+        _isTyping = false;
+      });
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _messages.add({
+          'role': 'chef',
+          'text': 'Ø­Ø¯Ø« Ø®Ø·Ø£ ÙÙŠ Ø§Ù„Ø§ØªØµØ§Ù„ Ø¨Ø§Ù„Ù…Ø·Ø¨Ø® Ø§Ù„Ø°ÙƒÙŠ: ${e.toString()}',
+        });
+        _isTyping = false;
+      });
+    }
+  }
+
+  Future<void> _sendFollowUpMessage() async {
+    final text = _msgController.text.trim();
+    if (text.isEmpty || _isTyping) return;
+
+    _msgController.clear();
+    setState(() {
+      _messages.add({'role': 'user', 'text': text});
+      _isTyping = true;
+    });
+    _scrollToBottom();
+
+    try {
+      final safeQuery = '$text\n(ØªØ°ÙƒÙŠØ± Ù„Ù„Ø´ÙŠÙ: Ø§Ù„ØªØ²Ù… Ø¨Ø§Ù„Ù„ØºØ© Ø§Ù„Ø¹Ø±Ø¨ÙŠØ© ÙˆØ¨Ø£Ø³Ù„ÙˆØ¨ Ù„Ø·ÙŠÙ ÙˆÙ…Ø­ØªØ±ÙØŒ ÙˆÙ„Ø§ ØªÙ‚ØªØ±Ø­ Ø£Ø¨Ø¯Ø§Ù‹ ØªÙ†Ø§ÙˆÙ„ Ù…ÙˆØ§Ø¯ ØºÙŠØ± ØºØ°Ø§Ø¦ÙŠØ© Ø£Ùˆ ØªØ³ØªØ®Ø¯Ù… ÙƒÙ„Ù…Ø© Ø£Ù†Ù…ÙŠ).';
+      final response = await _chatSession.sendMessage(Content.text(safeQuery));
+      if (!mounted) return;
+      setState(() {
+        _messages.add({
+          'role': 'chef',
+          'text': response.text ?? 'Ù‡Ù…Ù…Ù…ØŒ Ù„Ù… Ø£ÙÙ‡Ù… Ø°Ù„Ùƒ ØªÙ…Ø§Ù…Ø§Ù‹ØŒ Ù‡Ù„ ÙŠÙ…ÙƒÙ†ÙƒÙ Ø§Ù„ØªÙˆØ¶ÙŠØ­ØŸ ðŸŒ¸',
+        });
+        _isTyping = false;
+      });
+      _scrollToBottom();
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _messages.add({'role': 'chef', 'text': 'ØªØ¹Ø°Ø± Ø¥Ø±Ø³Ø§Ù„ Ø§Ù„Ø±Ø³Ø§Ù„Ø©ØŒ Ø­Ø§ÙˆÙ„ÙŠ Ù…Ø¬Ø¯Ø¯Ø§Ù‹ ðŸ“¡'});
+        _isTyping = false;
+      });
+    }
+  }
+
+  void _scrollToBottom() {
+    Future.delayed(const Duration(milliseconds: 100), () {
+      if (_scrollController.hasClients) {
+        _scrollController.animateTo(
+          _scrollController.position.maxScrollExtent,
+          duration: const Duration(milliseconds: 300),
+          curve: Curves.easeOut,
+        );
+      }
+    });
+  }
+
+  @override
+  void dispose() {
+    _msgController.dispose();
+    _scrollController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final bottomInset = MediaQuery.of(context).viewInsets.bottom;
+    return Container(
+      height: MediaQuery.of(context).size.height * 0.82,
+      padding: EdgeInsets.only(bottom: bottomInset),
+      decoration: BoxDecoration(
+        color: const Color(0xFF1A1525),
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(32)),
+        border: Border.all(color: widget.primaryColor.withValues(alpha: 0.6), width: 2),
+        boxShadow: [
+          BoxShadow(color: widget.primaryColor.withValues(alpha: 0.3), blurRadius: 25),
+        ],
+      ),
+      child: Column(
+        children: [
+          const SizedBox(height: 10),
+          Container(
+            width: 45,
+            height: 5,
+            decoration: BoxDecoration(color: Colors.grey.shade600, borderRadius: BorderRadius.circular(10)),
+          ),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+            child: Row(
+              children: [
+                KawaiiFloatingWidget(
+                  child: CircleAvatar(
+                    radius: 22,
+                    backgroundColor: widget.primaryColor.withValues(alpha: 0.2),
+                    child: const Text('ðŸ‘©â€ðŸ³', style: TextStyle(fontSize: 24)),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Ø§Ù„Ø´ÙŠÙ Ø§Ù„Ø°ÙƒÙŠ ÙÙŠ FoodCare âœ¨',
+                        style: TextStyle(color: widget.primaryColor, fontSize: 17, fontWeight: FontWeight.bold),
+                      ),
+                      const Text(
+                        'Ø§Ø³Ø£Ù„ÙŠÙ†ÙŠ Ø¹Ù† Ø£ÙŠ ØªØ¹Ø¯ÙŠÙ„ Ø£Ùˆ Ø¨Ø¯ÙŠÙ„ Ù„Ù„ÙˆØµÙØ© ðŸ’–',
+                        style: TextStyle(color: Colors.white70, fontSize: 11),
+                      ),
+                    ],
+                  ),
+                ),
+                IconButton(
+                  icon: const Icon(Icons.close_rounded, color: Colors.white70),
+                  onPressed: () => Navigator.pop(context),
+                ),
+              ],
+            ),
+          ),
+          Divider(color: widget.primaryColor.withValues(alpha: 0.2), height: 1),
+          Expanded(
+            child: ListView.builder(
+              controller: _scrollController,
+              padding: const EdgeInsets.all(16),
+              itemCount: _messages.length + (_isTyping ? 1 : 0),
+              itemBuilder: (context, index) {
+                if (index == _messages.length && _isTyping) {
+                  return Align(
+                    alignment: Alignment.centerRight,
+                    child: Container(
+                      margin: const EdgeInsets.only(bottom: 12),
+                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFF261F36),
+                        borderRadius: BorderRadius.circular(20),
+                        border: Border.all(color: widget.primaryColor.withValues(alpha: 0.4)),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          SizedBox(
+                            width: 16,
+                            height: 16,
+                            child: CircularProgressIndicator(color: widget.primaryColor, strokeWidth: 2),
+                          ),
+                          const SizedBox(width: 10),
+                          const Text('Ø§Ù„Ø´ÙŠÙ ÙŠÙƒØªØ¨ Ø§Ù„ÙˆØµÙØ©... ðŸ³âœ¨', style: TextStyle(color: Colors.white70, fontSize: 13)),
+                        ],
+                      ),
+                    ),
+                  );
+                }
+
+                final msg = _messages[index];
+                final isChef = msg['role'] == 'chef';
+
+                return KawaiiFadeSlide(
+                  index: 0,
+                  child: Align(
+                    alignment: isChef ? Alignment.centerRight : Alignment.centerLeft,
+                    child: Container(
+                      margin: const EdgeInsets.only(bottom: 12),
+                      padding: const EdgeInsets.all(14),
+                      constraints: BoxConstraints(maxWidth: MediaQuery.of(context).size.width * 0.82),
+                      decoration: BoxDecoration(
+                        color: isChef ? const Color(0xFF261F36) : widget.primaryColor,
+                        borderRadius: BorderRadius.only(
+                          topLeft: const Radius.circular(22),
+                          topRight: const Radius.circular(22),
+                          bottomLeft: isChef ? const Radius.circular(22) : const Radius.circular(4),
+                          bottomRight: isChef ? const Radius.circular(4) : const Radius.circular(22),
+                        ),
+                        border: isChef ? Border.all(color: widget.primaryColor.withValues(alpha: 0.45)) : null,
+                      ),
+                      child: Text(
+                        msg['text'] ?? '',
+                        style: TextStyle(
+                          color: isChef ? Colors.white : const Color(0xFF110E17),
+                          fontSize: 14,
+                          height: 1.55,
+                          fontWeight: isChef ? FontWeight.normal : FontWeight.bold,
+                        ),
+                      ),
+                    ),
+                  ),
+                );
+              },
+            ),
+          ),
+          Container(
+            padding: const EdgeInsets.fromLTRB(14, 10, 14, 16),
+            decoration: BoxDecoration(
+              color: const Color(0xFF1F1A2B),
+              border: Border(top: BorderSide(color: widget.primaryColor.withValues(alpha: 0.2))),
+            ),
+            child: Row(
+              children: [
+                Expanded(
+                  child: TextField(
+                    controller: _msgController,
+                    style: const TextStyle(color: Colors.white, fontSize: 14),
+                    onSubmitted: (_) => _sendFollowUpMessage(),
+                    decoration: InputDecoration(
+                      hintText: 'Ø§ÙƒØªØ¨ÙŠ Ø³Ø¤Ø§Ù„Ùƒ Ù„Ù„Ø´ÙŠÙ (Ù…Ø«Ù„Ø§Ù‹: Ø¨Ø¯ÙŠÙ„ Ø§Ù„Ø­Ù„ÙŠØ¨ØŸ)...',
+                      hintStyle: TextStyle(color: Colors.grey.shade500, fontSize: 12),
+                      filled: true,
+                      fillColor: const Color(0xFF110E17),
+                      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(24),
+                        borderSide: BorderSide.none,
+                      ),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                CircleAvatar(
+                  backgroundColor: widget.primaryColor,
+                  radius: 23,
+                  child: IconButton(
+                    icon: const Icon(Icons.send_rounded, color: Color(0xFF110E17), size: 20),
+                    onPressed: _sendFollowUpMessage,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+=== File: D:\foodcare_app\foodcare_app\lib\screens\settings\settings_screen.dart ===
+import 'package:flutter/material.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import '../../theme/theme_manager.dart';
+import '../../utils/helpers.dart';
+import '../auth/login_screen.dart';
+
+class SettingsScreen extends StatelessWidget {
+  const SettingsScreen({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return ValueListenableBuilder<Color>(
+      valueListenable: ThemeManager.themeColor,
+      builder: (context, primaryColor, _) {
+        return Scaffold(
+          backgroundColor: const Color(0xFF110E17),
+          appBar: AppBar(
+            title: const Text('Ø§Ù„Ø¥Ø¹Ø¯Ø§Ø¯Ø§Øª âš™ï¸ðŸŒ¸', style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold)),
+            backgroundColor: Colors.transparent,
+            elevation: 0,
+            centerTitle: true,
+            iconTheme: const IconThemeData(color: Colors.white),
+          ),
+          body: Padding(
+            padding: const EdgeInsets.all(20.0),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                KawaiiFadeSlide(
+                  index: 0,
+                  child: Container(
+                    padding: const EdgeInsets.all(16),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF1B1626),
+                      borderRadius: BorderRadius.circular(24),
+                      border: Border.all(color: primaryColor.withValues(alpha: 0.4), width: 1.5),
+                    ),
+                    child: ListTile(
+                      contentPadding: EdgeInsets.zero,
+                      leading: KawaiiFloatingWidget(
+                        child: CircleAvatar(
+                          radius: 24,
+                          backgroundColor: primaryColor.withValues(alpha: 0.2),
+                          child: const Text('ðŸ§¸', style: TextStyle(fontSize: 24)),
+                        ),
+                      ),
+                      title: Text(
+                        FirebaseAuth.instance.currentUser?.email ?? 'Ù…Ø³ØªØ®Ø¯Ù… FoodCare',
+                        style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+                      ),
+                      subtitle: Text('Ø­Ø³Ø§Ø¨ Ù…ØªØµÙ„ Ø¨Ø§Ù„Ø³Ø­Ø§Ø¨Ø© âœ¨', style: TextStyle(color: primaryColor, fontSize: 12)),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 24),
+                KawaiiFadeSlide(
+                  index: 1,
+                  child: Text('Ù„ÙˆÙ† Ø«ÙŠÙ… Ø§Ù„Ø«Ù„Ø§Ø¬Ø© Ø§Ù„Ù…ÙØ¶Ù„ ðŸŽ¨ðŸ’–', style: TextStyle(color: primaryColor, fontSize: 15, fontWeight: FontWeight.bold)),
+                ),
+                const SizedBox(height: 12),
+                KawaiiFadeSlide(
+                  index: 2,
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 16),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF1B1626),
+                      borderRadius: BorderRadius.circular(24),
+                      border: Border.all(color: Colors.white10),
+                    ),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceAround,
+                      children: ThemeManager.availableColors.map((color) {
+                        final isSelected = primaryColor == color;
+                        return GestureDetector(
+                          onTap: () => ThemeManager.updateTheme(color),
+                          child: AnimatedScale(
+                            scale: isSelected ? 1.2 : 1.0,
+                            duration: const Duration(milliseconds: 200),
+                            child: Container(
+                              padding: const EdgeInsets.all(3),
+                              decoration: BoxDecoration(
+                                shape: BoxShape.circle,
+                                border: Border.all(color: isSelected ? Colors.white : Colors.transparent, width: 2.5),
+                              ),
+                              child: Container(
+                                width: 28,
+                                height: 28,
+                                decoration: BoxDecoration(color: color, shape: BoxShape.circle),
+                              ),
+                            ),
+                          ),
+                        );
+                      }).toList(),
+                    ),
+                  ),
+                ),
+                const Spacer(),
+                
+                // Ø²Ø± Ù…Ø¹Ø§ÙŠÙ†Ø© Ø´Ø§Ø´Ø© ØªØ³Ø¬ÙŠÙ„ Ø§Ù„Ø¯Ø®ÙˆÙ„ Ù…Ø¹ ØªÙ…Ø±ÙŠØ± isPreview: true
+                KawaiiFadeSlide(
+                  index: 3,
+                  child: SizedBox(
+                    width: double.infinity,
+                    height: 50,
+                    child: ElevatedButton.icon(
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: primaryColor.withValues(alpha: 0.15),
+                        foregroundColor: primaryColor,
+                        elevation: 0,
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+                      ),
+                      onPressed: () {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(builder: (_) => const LoginScreen(isPreview: true)),
+                        );
+                      },
+                      icon: const Icon(Icons.remove_red_eye_rounded, size: 20),
+                      label: const Text('Ù…Ø¹Ø§ÙŠÙ†Ø© Ø´Ø§Ø´Ø© ØªØ³Ø¬ÙŠÙ„ Ø§Ù„Ø¯Ø®ÙˆÙ„ ðŸšªâœ¨', style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold)),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 12),
+
+                // Ø²Ø± ØªØ³Ø¬ÙŠÙ„ Ø§Ù„Ø®Ø±ÙˆØ¬ Ø§Ù„ÙØ¹Ù„ÙŠ
+                KawaiiFadeSlide(
+                  index: 4,
+                  child: SizedBox(
+                    width: double.infinity,
+                    height: 50,
+                    child: ElevatedButton.icon(
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Colors.redAccent.withValues(alpha: 0.15),
+                        foregroundColor: Colors.redAccent,
+                        elevation: 0,
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+                      ),
+                      onPressed: () async {
+                        await FirebaseAuth.instance.signOut();
+                        if (context.mounted) {
+                          Navigator.pushAndRemoveUntil(
+                            context,
+                            MaterialPageRoute(builder: (_) => const LoginScreen()),
+                            (route) => false,
+                          );
+                        }
+                      },
+                      icon: const Icon(Icons.logout_rounded, size: 20),
+                      label: const Text('ØªØ³Ø¬ÙŠÙ„ Ø§Ù„Ø®Ø±ÙˆØ¬ Ø§Ù„ÙØ¹Ù„ÙŠ ðŸ‘‹', style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold)),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 20),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+}
+
+=== File: D:\foodcare_app\foodcare_app\lib\screens\shopping\shopping_list_screen.dart ===
+import 'package:flutter/material.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import '../../models/shopping_item_model.dart';
+import '../../theme/theme_manager.dart';
+import '../../utils/helpers.dart';
+
+class ShoppingListScreen extends StatefulWidget {
+  const ShoppingListScreen({super.key});
+
+  @override
+  State<ShoppingListScreen> createState() => _ShoppingListScreenState();
+}
+
+class _ShoppingListScreenState extends State<ShoppingListScreen> {
+  final TextEditingController _itemController = TextEditingController();
+
+  CollectionReference get _shoppingCollection {
+    final user = FirebaseAuth.instance.currentUser;
+    final uid = user?.uid ?? 'guest';
+    return FirebaseFirestore.instance.collection('users').doc(uid).collection('shopping_list');
+  }
+
+  Future<void> _addItem([String? customName]) async {
+    final name = customName ?? _itemController.text.trim();
+    if (name.isEmpty) return;
+
+    await _shoppingCollection.add({
+      'name': name,
+      'quantity': 1,
+      'isChecked': false,
+    });
+
+    if (customName == null) {
+      _itemController.clear();
+    }
+  }
+
+  @override
+  void dispose() {
+    _itemController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return ValueListenableBuilder<Color>(
+      valueListenable: ThemeManager.themeColor,
+      builder: (context, primaryColor, _) {
+        return Scaffold(
+          backgroundColor: const Color(0xFF16121E),
+          appBar: AppBar(
+            title: const Text('Ù‚Ø§Ø¦Ù…Ø© Ø§Ù„ØªØ³ÙˆÙ‚ Ø§Ù„Ø°ÙƒÙŠØ© ðŸ›’âœ¨', style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold)),
+            backgroundColor: Colors.transparent,
+            elevation: 0,
+            centerTitle: true,
+            iconTheme: const IconThemeData(color: Colors.white),
+          ),
+          body: Padding(
+            padding: const EdgeInsets.all(16.0),
+            child: Column(
+              children: [
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF1F1A2B),
+                    borderRadius: BorderRadius.circular(20),
+                    border: Border.all(color: primaryColor.withValues(alpha: 0.4)),
+                  ),
+                  child: Row(
+                    children: [
+                      Expanded(
+                        child: TextField(
+                          controller: _itemController,
+                          style: const TextStyle(color: Colors.white),
+                          decoration: InputDecoration(
+                            hintText: 'Ø¥Ø¶Ø§ÙØ© ØºØ±Ø¶ Ø¬Ø¯ÙŠØ¯ Ù„Ù„ØªØ³ÙˆÙ‚ (Ù…Ø«Ø§Ù„: Ø­Ù„ÙŠØ¨ØŒ ØªÙØ§Ø­)...',
+                            hintStyle: TextStyle(color: Colors.grey.shade500, fontSize: 13),
+                            border: InputBorder.none,
+                          ),
+                          onSubmitted: (_) => _addItem(),
+                        ),
+                      ),
+                      IconButton(
+                        icon: Icon(Icons.add_circle_rounded, color: primaryColor, size: 28),
+                        onPressed: () => _addItem(),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 16),
+                Expanded(
+                  child: StreamBuilder<QuerySnapshot>(
+                    stream: _shoppingCollection.snapshots(),
+                    builder: (context, snapshot) {
+                      if (snapshot.connectionState == ConnectionState.waiting) {
+                        return Center(child: CircularProgressIndicator(color: primaryColor));
+                      }
+
+                      final docs = snapshot.data?.docs ?? [];
+                      final items = docs.map((d) => ShoppingItem.fromMap(d.id, d.data() as Map<String, dynamic>)).toList();
+
+                      if (items.isEmpty) {
+                        return Center(
+                          child: KawaiiFloatingWidget(
+                            child: Column(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                const Text('ðŸ›’âœ¨', style: TextStyle(fontSize: 45)),
+                                const SizedBox(height: 12),
+                                const Text('Ù‚Ø§Ø¦Ù…Ø© Ø§Ù„ØªØ³ÙˆÙ‚ ÙØ§Ø±ØºØ© ÙÙŠ FoodCare!', style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold)),
+                                const SizedBox(height: 6),
+                                Text('Ø£Ø¶ÙŠÙÙŠ Ø§Ù„Ø£ØºØ±Ø§Ø¶ Ø§Ù„Ù†Ø§Ù‚ØµØ© Ù„ØªØ¬Ù‡ÙŠØ² Ø¬Ø¯ÙˆÙ„ÙƒÙ Ø§Ù„Ù‚Ø§Ø¯Ù… ðŸ’–', style: TextStyle(color: Colors.grey.shade400, fontSize: 12)),
+                              ],
+                            ),
+                          ),
+                        );
+                      }
+
+                      return ListView.builder(
+                        itemCount: items.length,
+                        itemBuilder: (context, index) {
+                          final item = items[index];
+                          return KawaiiFadeSlide(
+                            index: index,
+                            child: Container(
+                              margin: const EdgeInsets.only(bottom: 10),
+                              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                              decoration: BoxDecoration(
+                                color: const Color(0xFF1F1A2B),
+                                borderRadius: BorderRadius.circular(18),
+                                border: Border.all(
+                                  color: item.isChecked ? Colors.greenAccent.withValues(alpha: 0.3) : primaryColor.withValues(alpha: 0.3),
+                                ),
+                              ),
+                              child: Row(
+                                children: [
+                                  Checkbox(
+                                    value: item.isChecked,
+                                    activeColor: primaryColor,
+                                    checkColor: const Color(0xFF16121E),
+                                    onChanged: (val) {
+                                      _shoppingCollection.doc(item.id).update({'isChecked': val ?? false});
+                                    },
+                                  ),
+                                  Text(AppHelpers.getProductEmoji(item.name), style: const TextStyle(fontSize: 22)),
+                                  const SizedBox(width: 12),
+                                  Expanded(
+                                    child: Text(
+                                      item.name,
+                                      style: TextStyle(
+                                        color: item.isChecked ? Colors.grey.shade500 : Colors.white,
+                                        fontSize: 15,
+                                        fontWeight: FontWeight.bold,
+                                        decoration: item.isChecked ? TextDecoration.lineThrough : null,
+                                      ),
+                                    ),
+                                  ),
+                                  IconButton(
+                                    icon: const Icon(Icons.delete_outline_rounded, color: Colors.redAccent, size: 20),
+                                    onPressed: () => _shoppingCollection.doc(item.id).delete(),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          );
+                        },
+                      );
+                    },
+                  ),
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+}
+
+=== File: D:\foodcare_app\foodcare_app\lib\screens\barcode_scanner_screen.dart ===
+import 'package:flutter/material.dart';
+import 'package:mobile_scanner/mobile_scanner.dart';
+
+class BarcodeScannerScreen extends StatefulWidget {
+  const BarcodeScannerScreen({super.key});
+
+  @override
+  State<BarcodeScannerScreen> createState() => _BarcodeScannerScreenState();
+}
+
+class _BarcodeScannerScreenState extends State<BarcodeScannerScreen> {
+  bool _isScanned = false;
+  final MobileScannerController _controller = MobileScannerController(
+    detectionSpeed: DetectionSpeed.noDuplicates,
+    formats: [BarcodeFormat.all],
+  );
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: Colors.black,
+      appBar: AppBar(
+        title: const Text('Ù…Ø³Ø­ Ø§Ù„Ø¨Ø§Ø±ÙƒÙˆØ¯ ðŸ“·', style: TextStyle(color: Colors.white)),
+        backgroundColor: const Color(0xFF110E17),
+        iconTheme: const IconThemeData(color: Colors.white),
+      ),
+      body: Stack(
+        children: [
+          MobileScanner(
+            controller: _controller,
+            onDetect: (capture) {
+              if (_isScanned) return;
+              final List<Barcode> barcodes = capture.barcodes;
+              for (final barcode in barcodes) {
+                final String? code = barcode.rawValue;
+                if (code != null && code.isNotEmpty) {
+                  _isScanned = true;
+                  Navigator.pop(context, code);
+                  break;
+                }
+              }
+            },
+          ),
+          Center(
+            child: Container(
+              width: 260,
+              height: 160,
+              decoration: BoxDecoration(
+                border: Border.all(color: Colors.greenAccent, width: 3),
+                borderRadius: BorderRadius.circular(16),
+              ),
+            ),
+          ),
+          const Positioned(
+            bottom: 40,
+            left: 0,
+            right: 0,
+            child: Text(
+              'ÙˆØ¬Ù‘Ù‡ÙŠ Ø§Ù„Ø¨Ø§Ø±ÙƒÙˆØ¯ Ø¯Ø§Ø®Ù„ Ø§Ù„Ø¥Ø·Ø§Ø± ÙÙŠ Ø¥Ø¶Ø§Ø¡Ø© Ø¬ÙŠØ¯Ø©',
+              textAlign: TextAlign.center,
+              style: TextStyle(color: Colors.white, fontSize: 15, backgroundColor: Colors.black54),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+=== File: D:\foodcare_app\foodcare_app\lib\theme\theme_manager.dart ===
+import 'package:flutter/material.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+
+class ThemeManager {
+  static final ValueNotifier<Color> themeColor = ValueNotifier<Color>(const Color(0xFFFF8FAB));
+  static const String _themeKey = 'selected_theme_color';
+
+  static const List<Color> availableColors = [
+    Color(0xFFFF8FAB), // ÙˆØ±Ø¯ÙŠ Ù†Ø§Ø¹Ù…
+    Color(0xFFC77DFF), // Ù„Ø§ÙÙ†Ø¯Ø± / Ø¨Ù†ÙØ³Ø¬ÙŠ ÙØ§ØªØ­
+    Color(0xFFFFB5A7), // Ø®ÙˆØ®ÙŠ Ø¯Ø§ÙØ¦
+    Color(0xFF80ED99), // Ù†Ø¹Ù†Ø§Ø¹ÙŠ Ù‡Ø§Ø¯Ø¦
+    Color(0xFFFAD2E1), // ÙˆØ±Ø¯ÙŠ Ø¨Ø§Ø³ØªÙŠÙ„ ÙØ§ØªØ­
+  ];
+
+  static Future<void> loadSavedTheme() async {
+    final prefs = await SharedPreferences.getInstance();
+    final savedColorValue = prefs.getInt(_themeKey);
+    if (savedColorValue != null) {
+      themeColor.value = Color(savedColorValue);
+    }
+  }
+
+  static Future<void> updateTheme(Color newColor) async {
+    themeColor.value = newColor;
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setInt(_themeKey, newColor.toARGB32());
+  }
+}
+
+=== File: D:\foodcare_app\foodcare_app\lib\utils\helpers.dart ===
+import 'package:flutter/material.dart';
+import '../models/product_model.dart';
+
+class AppHelpers {
+  static String getProductEmoji(String name) {
+    final lowerName = name.toLowerCase();
+    if (lowerName.contains('Ø­Ù„ÙŠØ¨') || lowerName.contains('milk') || lowerName.contains('Ù„Ø¨Ù†')) return 'ðŸ¥›';
+    if (lowerName.contains('Ø¨ÙŠØ¶') || lowerName.contains('egg')) return 'ðŸ¥š';
+    if (lowerName.contains('Ø¬Ø¨Ù†') || lowerName.contains('cheese')) return 'ðŸ§€';
+    if (lowerName.contains('Ø®Ø¨Ø²') || lowerName.contains('bread') || lowerName.contains('ØªÙˆØ³Øª')) return 'ðŸž';
+    if (lowerName.contains('Ø¯Ø¬Ø§Ø¬') || lowerName.contains('chicken') || lowerName.contains('Ù„Ø­Ù…')) return 'ðŸ—';
+    if (lowerName.contains('ØªÙØ§Ø­') || lowerName.contains('Ù…ÙˆØ²') || lowerName.contains('ÙÙˆØ§ÙƒÙ‡')) return 'ðŸŽ';
+    if (lowerName.contains('Ø·Ù…Ø§Ø·Ù…') || lowerName.contains('Ø¨Ù†Ø¯ÙˆØ±Ø©') || lowerName.contains('Ø®ÙŠØ§Ø±')) return 'ðŸ¥—';
+    if (lowerName.contains('Ù‚Ù‡ÙˆØ©') || lowerName.contains('Ù†Ø³ÙƒØ§ÙÙŠÙ‡')) return 'â˜•';
+    if (lowerName.contains('Ø´ÙˆÙƒÙˆÙ„Ø§ØªØ©') || lowerName.contains('ÙƒÙŠÙƒ')) return 'ðŸ«';
+    if (lowerName.contains('ÙØ±Ø§ÙˆÙ„Ø©') || lowerName.contains('ØªÙˆØª')) return 'ðŸ“';
+    if (lowerName.contains('Ø¹ØµÙŠØ±') || lowerName.contains('Ù…Ø§Ø¡')) return 'ðŸ§ƒ';
+    return 'ðŸ±';
+  }
+
+  static Color getStatusColor(ProductStatus status) {
+    switch (status) {
+      case ProductStatus.expired:
+        return const Color(0xFFFF6B8B);
+      case ProductStatus.expiringSoon:
+        return const Color(0xFFFFBE76);
+      case ProductStatus.fresh:
+        return const Color(0xFF7BED9F);
+    }
+  }
+
+  static String getStatusText(ProductStatus status) {
+    switch (status) {
+      case ProductStatus.expired:
+        return 'Ø£Ù†Ù‚Ø°ÙŠÙ†ÙŠ! Ù…Ù†ØªÙ‡ÙŠ Ø§Ù„ØµÙ„Ø§Ø­ÙŠØ© ðŸ¥€';
+      case ProductStatus.expiringSoon:
+        return 'ÙŠÙ†ØªÙ‡ÙŠ Ù‚Ø±ÙŠØ¨Ø§Ù‹ØŒ Ø§Ø³ØªÙ‡Ù„ÙƒÙŠÙ‡ â³';
+      case ProductStatus.fresh:
+        return 'Ø·Ø§Ø²Ø¬ ÙˆÙ…Ù…ØªØ§Ø² âœ¨';
+    }
+  }
+}
+
+class KawaiiFadeSlide extends StatelessWidget {
+  final Widget child;
+  final int index;
+
+  const KawaiiFadeSlide({super.key, required this.child, this.index = 0});
+
+  @override
+  Widget build(BuildContext context) {
+    return TweenAnimationBuilder<double>(
+      tween: Tween(begin: 0.0, end: 1.0),
+      duration: Duration(milliseconds: 350 + (index * 70).clamp(0, 500)),
+      curve: Curves.easeOutBack,
+      builder: (context, value, child) {
+        return Opacity(
+          opacity: value.clamp(0.0, 1.0),
+          child: Transform.translate(
+            offset: Offset(0, 22 * (1 - value)),
+            child: child,
+          ),
+        );
+      },
+      child: child,
+    );
+  }
+}
+
+class KawaiiFloatingWidget extends StatefulWidget {
+  final Widget child;
+  const KawaiiFloatingWidget({super.key, required this.child});
+
+  @override
+  State<KawaiiFloatingWidget> createState() => _KawaiiFloatingWidgetState();
+}
+
+class _KawaiiFloatingWidgetState extends State<KawaiiFloatingWidget>
+    with SingleTickerProviderStateMixin {
+  late AnimationController _controller;
+  late Animation<double> _animation;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 1600),
+    )..repeat(reverse: true);
+    _animation = Tween<double>(begin: -4.0, end: 4.0).animate(
+      CurvedAnimation(parent: _controller, curve: Curves.easeInOutSine),
+    );
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AnimatedBuilder(
+      animation: _animation,
+      builder: (context, child) {
+        return Transform.translate(
+          offset: Offset(0, _animation.value),
+          child: child,
+        );
+      },
+      child: widget.child,
+    );
+  }
+}
+
+=== File: D:\foodcare_app\foodcare_app\lib\widgets\product_card.dart ===
+import 'package:flutter/material.dart';
+
+class ProductCard extends StatelessWidget {
+  final String productName;
+  final String expiryDate;
+  final Color themeColor;
+  final VoidCallback onDelete;
+
+  const ProductCard({
+    super.key,
+    required this.productName,
+    required this.expiryDate,
+    required this.themeColor,
+    required this.onDelete,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      margin: const EdgeInsets.symmetric(vertical: 8, horizontal: 4),
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: const Color(0xFF1F1A2B),
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: themeColor.withValues(alpha: 0.3)),
+      ),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(10),
+                decoration: BoxDecoration(
+                  color: themeColor.withValues(alpha: 0.15),
+                  shape: BoxShape.circle,
+                ),
+                child: Icon(Icons.fastfood, color: themeColor, size: 20),
+              ),
+              const SizedBox(width: 14),
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    productName,
+                    style: const TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: Colors.white),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    'ÙŠÙ†ØªÙ‡ÙŠ ÙÙŠ: $expiryDate',
+                    style: TextStyle(fontSize: 12, color: Colors.grey.shade400),
+                  ),
+                ],
+              ),
+            ],
+          ),
+          IconButton(
+            icon: const Icon(Icons.delete_outline, color: Colors.redAccent, size: 20),
+            onPressed: onDelete,
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+=== File: D:\foodcare_app\foodcare_app\lib\firebase_options.dart ===
+// File generated by FlutterFire CLI.
+// ignore_for_file: type=lint
+import 'package:firebase_core/firebase_core.dart' show FirebaseOptions;
+import 'package:flutter/foundation.dart'
+    show defaultTargetPlatform, kIsWeb, TargetPlatform;
+
+/// Default [FirebaseOptions] for use with your Firebase apps.
+///
+/// Example:
+/// ```dart
+/// import 'firebase_options.dart';
+/// // ...
+/// await Firebase.initializeApp(
+///   options: DefaultFirebaseOptions.currentPlatform,
+/// );
+/// ```
+class DefaultFirebaseOptions {
+  static FirebaseOptions get currentPlatform {
+    if (kIsWeb) {
+      return web;
+    }
+    switch (defaultTargetPlatform) {
+      case TargetPlatform.android:
+        return android;
+      case TargetPlatform.iOS:
+        return ios;
+      case TargetPlatform.macOS:
+        return macos;
+      case TargetPlatform.windows:
+        return windows;
+      case TargetPlatform.linux:
+        throw UnsupportedError(
+          'DefaultFirebaseOptions have not been configured for linux - '
+          'you can reconfigure this by running the FlutterFire CLI again.',
+        );
+      default:
+        throw UnsupportedError(
+          'DefaultFirebaseOptions are not supported for this platform.',
+        );
+    }
+  }
+
+  static const FirebaseOptions web = FirebaseOptions(
+    apiKey: 'AIzaSyAErOzVpnU-OaIaEcPkRye9X5PRnfhrIco',
+    appId: '1:778743721518:web:d46097a16d06e8c6da39bf',
+    messagingSenderId: '778743721518',
+    projectId: 'foodcave-617fc',
+    authDomain: 'foodcave-617fc.firebaseapp.com',
+    storageBucket: 'foodcave-617fc.firebasestorage.app',
+    measurementId: 'G-8SMDEM1EW6',
+  );
+
+  static const FirebaseOptions android = FirebaseOptions(
+    apiKey: 'AIzaSyBQMuJV9LwMXmdP_lq_ZnnAsNXqjRmRSGY',
+    appId: '1:778743721518:android:25b3acf36646408bda39bf',
+    messagingSenderId: '778743721518',
+    projectId: 'foodcave-617fc',
+    storageBucket: 'foodcave-617fc.firebasestorage.app',
+  );
+
+  static const FirebaseOptions ios = FirebaseOptions(
+    apiKey: 'AIzaSyCjhrkTvVezO60n5vk-HstCqCsLYfJQrSA',
+    appId: '1:778743721518:ios:039a6a1f5cb96222da39bf',
+    messagingSenderId: '778743721518',
+    projectId: 'foodcave-617fc',
+    storageBucket: 'foodcave-617fc.firebasestorage.app',
+    iosBundleId: 'com.example.uni',
+  );
+
+  static const FirebaseOptions macos = FirebaseOptions(
+    apiKey: 'AIzaSyCjhrkTvVezO60n5vk-HstCqCsLYfJQrSA',
+    appId: '1:778743721518:ios:039a6a1f5cb96222da39bf',
+    messagingSenderId: '778743721518',
+    projectId: 'foodcave-617fc',
+    storageBucket: 'foodcave-617fc.firebasestorage.app',
+    iosBundleId: 'com.example.uni',
+  );
+
+  static const FirebaseOptions windows = FirebaseOptions(
+    apiKey: 'AIzaSyAErOzVpnU-OaIaEcPkRye9X5PRnfhrIco',
+    appId: '1:778743721518:web:e989af557dee0031da39bf',
+    messagingSenderId: '778743721518',
+    projectId: 'foodcave-617fc',
+    authDomain: 'foodcave-617fc.firebaseapp.com',
+    storageBucket: 'foodcave-617fc.firebasestorage.app',
+    measurementId: 'G-05ZBCTYGTV',
+  );
+}
+
+=== File: D:\foodcare_app\foodcare_app\lib\main.dart ===
+import 'package:flutter/material.dart';
+import 'package:firebase_core/firebase_core.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'screens/auth/login_screen.dart';
+import 'screens/home/home_screen.dart';
+import 'theme/theme_manager.dart';
+import 'firebase_options.dart';
+
+void main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  await Firebase.initializeApp(
+    options: DefaultFirebaseOptions.currentPlatform,
+  );
+  await ThemeManager.loadSavedTheme();
+  runApp(const FoodCareApp());
+}
+
+class FoodCareApp extends StatelessWidget {
+  const FoodCareApp({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return ValueListenableBuilder<Color>(
+      valueListenable: ThemeManager.themeColor,
+      builder: (context, currentColor, _) {
+        return MaterialApp(
+          title: 'FoodCare',
+          debugShowCheckedModeBanner: false,
+          theme: ThemeData(
+            useMaterial3: true,
+            brightness: Brightness.dark,
+            scaffoldBackgroundColor: const Color(0xFF16121E),
+            colorScheme: ColorScheme.dark(
+              primary: currentColor,
+              surface: const Color(0xFF1F1A2B),
+            ),
+          ),
+          home: StreamBuilder<User?>(
+            stream: FirebaseAuth.instance.authStateChanges(),
+            builder: (context, snapshot) {
+              if (snapshot.connectionState == ConnectionState.waiting) {
+                return Scaffold(
+                  body: Center(child: CircularProgressIndicator(color: currentColor)),
+                );
+              }
+              if (snapshot.hasData) {
+                return const HomeScreen();
+              }
+              return const LoginScreen();
+            },
+          ),
+        );
+      },
+    );
+  }
+}
+
